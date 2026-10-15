@@ -7,8 +7,12 @@ const cities = [
 
 const DEFAULT_BUILDINGS = [
   { name: "Intendencia", meta1: 18, meta2: 28, meta3: 36, meta4: 42, meta5: 47, meta6: 49 },
-  { name: "Deposito 1", meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
-  { name: "Deposito 2", meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
+  { 
+    name: "Depósito", 
+    isMulti: true, 
+    instances: ["Depósito 1", "Depósito 2"], 
+    meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 
+  },
   { name: "Oficina del Arquitecto", meta1: 16, meta2: 32, meta3: 50, meta4: 50, meta5: 50, meta6: 50 },
   { name: "Carpintería", meta1: 16, meta2: 32, meta3: 50, meta4: 50, meta5: 50, meta6: 50 },
   { name: "Materia Especial", meta1: 12, meta2: 24, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
@@ -22,8 +26,7 @@ const DEFAULT_BUILDINGS = [
 
 const BUILDING_COSTS = {
   "Intendencia": { baseWood: 40, factorWood: 1.28, baseMarble: 32, factorMarble: 1.28, marbleStartLvl: 5 },
-  "Deposito 1": { baseWood: 40, factorWood: 1.33, baseMarble: 32, factorMarble: 1.33, marbleStartLvl: 4 },
-  "Deposito 2": { baseWood: 40, factorWood: 1.33, baseMarble: 32, factorMarble: 1.33, marbleStartLvl: 4 },
+  "Depósito": { baseWood: 40, factorWood: 1.33, baseMarble: 32, factorMarble: 1.33, marbleStartLvl: 4 },
   "Oficina del Arquitecto": { baseWood: 91, factorWood: 1.17, baseMarble: 60, factorMarble: 1.17, marbleStartLvl: 1 },
   "Carpintería": { baseWood: 66, factorWood: 1.17, baseMarble: 29, factorMarble: 1.17, marbleStartLvl: 1 },
   "Materia Especial": { baseWood: 101, factorWood: 1.17, baseMarble: 43, factorMarble: 1.17, marbleStartLvl: 1 },
@@ -74,13 +77,12 @@ let cityLabels = {};
 let activeCityCount = 13;
 let currentBuilding = null;
 let isEditing = false;
-let currentView = "construction"; // "construction" | "troops"
+let currentView = "construction"; // "summary" | "construction" | "troops" | "settings"
 
-// Datos de tropas
 let troopsData = {
   selectedCities: [],
   activeTroopCity: null,
-  activeTroopType: "units", // "units" | "ships"
+  activeTroopType: "units",
   cities: {}
 };
 
@@ -102,7 +104,6 @@ function getBuildingUpgradeCost(buildingName, curLvl, city) {
     rawMarble = Math.floor(cfg.baseMarble * Math.pow(cfg.factorMarble, marbleExp));
   }
   
-  // Niveles de edificios ahorradores en esa ciudad
   const carpLevel = Math.min(50, appData[city]?.["Carpintería"] || 0);
   const archLevel = Math.min(50, appData[city]?.["Oficina del Arquitecto"] || 0);
   
@@ -130,13 +131,12 @@ function getUnitCostInCity(unit, city) {
   };
 }
 
-// Iniciar con la estructura por defecto si no hay datos guardados
 function getInitialData() {
   const data = {};
   cities.forEach(city => {
     data[city] = {};
     buildingsConfig.forEach(b => {
-      data[city][b.name] = 0;
+      data[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
     });
   });
   return data;
@@ -177,7 +177,7 @@ function loadData(callback) {
       DEFAULT_BUILDINGS.forEach(defB => {
         const found = loadedBuildings.find(b => b.name === defB.name);
         if (found) {
-          syncedBuildings.push(found);
+          syncedBuildings.push({ ...defB, ...found });
         } else {
           syncedBuildings.push({ ...defB });
           updated = true;
@@ -198,12 +198,25 @@ function loadData(callback) {
           appData[city] = {};
           updated = true;
         }
+
+        // Migración: Si existen Deposito 1 o Deposito 2 como claves sueltas, unificarlas en Depósito: [d1, d2]
+        if (appData[city]["Deposito 1"] !== undefined || appData[city]["Deposito 2"] !== undefined) {
+          const d1 = appData[city]["Deposito 1"] || 0;
+          const d2 = appData[city]["Deposito 2"] || 0;
+          if (!Array.isArray(appData[city]["Depósito"])) {
+            appData[city]["Depósito"] = [d1, d2];
+          }
+          delete appData[city]["Deposito 1"];
+          delete appData[city]["Deposito 2"];
+          updated = true;
+        }
+
         buildingsConfig.forEach(b => {
           if (appData[city][b.name] === undefined) {
-            appData[city][b.name] = 0;
+            appData[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
             updated = true;
-          } else if (Array.isArray(appData[city][b.name])) {
-            appData[city][b.name] = appData[city][b.name][0] || 0;
+          } else if (b.isMulti && !Array.isArray(appData[city][b.name])) {
+            appData[city][b.name] = [appData[city][b.name] || 0, 0];
             updated = true;
           }
         });
@@ -224,7 +237,6 @@ function loadData(callback) {
         troopsData.activeTroopCity = troopsData.selectedCities[0];
       }
     } else {
-      // Inicializar con la primera ciudad activa
       troopsData = {
         selectedCities: [cities[0]],
         activeTroopCity: cities[0],
@@ -295,13 +307,16 @@ function renderTabs() {
   });
 }
 
-function getActiveTargetIndex() {
+function getActiveTargetIndex(building = currentBuilding) {
   const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
   for (let i = 0; i < metaKeys.length; i++) {
-    const targetValue = currentBuilding[metaKeys[i]];
+    const targetValue = building[metaKeys[i]];
     const allMeetTarget = cities.slice(0, activeCityCount).every(city => {
-      const level = appData[city]?.[currentBuilding.name] || 0;
-      return level >= targetValue;
+      const val = appData[city]?.[building.name];
+      if (building.isMulti && Array.isArray(val)) {
+        return val.every(l => l >= targetValue);
+      }
+      return (val || 0) >= targetValue;
     });
     if (!allMeetTarget) {
       return i;
@@ -366,135 +381,267 @@ function renderContent() {
     const label = cityLabels[city];
     const shortCode = (label && label.abbr) ? label.abbr : '';
     const fullName = (label && label.name) ? label.name : city;
-    
-    row.className = 'city-row';
-    
-    const cityInfo = document.createElement('div');
-    cityInfo.className = 'city-info';
-    
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'city-name';
-    nameSpan.textContent = shortCode;
-    nameSpan.title = fullName;
-    
-    const progressContainer = document.createElement('div');
-    progressContainer.className = 'progress-container';
-    
-    const progressFill = document.createElement('div');
-    const level = appData[city]?.[currentBuilding.name] || 0;
-    const lvlClass = getLevelClass(level, currentBuilding);
-    progressFill.className = `progress-fill ${lvlClass}`;
-    
-    const percentage = Math.min(100, (level / maxGoal) * 100);
-    progressFill.style.width = `${percentage}%`;
-    progressContainer.appendChild(progressFill);
-    
-    // Costes para el siguiente nivel con ahorradores
-    const cost = getBuildingUpgradeCost(currentBuilding.name, level, city);
-    let costEl = null;
-    if (cost) {
-      costEl = document.createElement('div');
-      costEl.className = 'building-cost-tag';
-      
-      const woodTitle = `Madera: ${cost.wood.toLocaleString()}${cost.woodDiscount > 0 ? ` (-${cost.woodDiscount}% Carpintería)` : ''}`;
-      costEl.innerHTML = `
-        <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="${woodTitle}">
-          <img src="assets/resources/wood.png" alt="Madera">
-          <span>${formatResNum(cost.wood)}</span>
-        </span>
-      `;
-      
-      if (cost.marble > 0) {
-        const marbleTitle = `Mármol: ${cost.marble.toLocaleString()}${cost.marbleDiscount > 0 ? ` (-${cost.marbleDiscount}% Arquitecto)` : ''}`;
-        costEl.innerHTML += `
-          <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="${marbleTitle}">
-            <img src="assets/resources/marble.png" alt="Mármol">
-            <span>${formatResNum(cost.marble)}</span>
-          </span>
-        `;
-      }
-    }
-    
-    cityInfo.appendChild(nameSpan);
-    cityInfo.appendChild(progressContainer);
-    if (costEl) cityInfo.appendChild(costEl);
-    
-    const controls = document.createElement('div');
-    controls.className = 'controls';
-    
-    if (isEditing) {
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.className = 'level-input';
-      input.min = '0';
-      input.value = level;
-      input.setAttribute('data-city', city);
-      controls.appendChild(input);
-    } else {
-      const minusBtn = document.createElement('button');
-      minusBtn.className = 'btn';
-      minusBtn.textContent = '-';
-      
-      const badge = document.createElement('div');
-      badge.className = `level-badge ${lvlClass}`;
-      badge.textContent = level;
-      
-      const plusBtn = document.createElement('button');
-      plusBtn.className = 'btn';
-      plusBtn.textContent = '+';
-      
-      const updateUI = (newLevel) => {
-        appData[city][currentBuilding.name] = newLevel;
-        badge.textContent = newLevel;
+
+    if (currentBuilding.isMulti) {
+      // Renderizado especial de edificio multi-instancia (Depósito D1 y D2)
+      row.className = 'city-row multi-instance';
+
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'city-name-container';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'city-name';
+      nameSpan.textContent = shortCode;
+      nameSpan.title = fullName;
+      nameContainer.appendChild(nameSpan);
+      row.appendChild(nameContainer);
+
+      const instancesList = document.createElement('div');
+      instancesList.className = 'city-instances-list';
+
+      const levels = appData[city]?.[currentBuilding.name] || [0, 0];
+
+      currentBuilding.instances.forEach((instName, instIdx) => {
+        const instRow = document.createElement('div');
+        instRow.className = 'city-instance-row';
+
+        const instLabel = document.createElement('span');
+        instLabel.className = 'instance-label';
+        instLabel.textContent = instIdx === 0 ? 'D1' : 'D2';
+        instRow.appendChild(instLabel);
+
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'progress-container';
         
-        const newLvlClass = getLevelClass(newLevel, currentBuilding);
-        badge.className = `level-badge ${newLvlClass}`;
-        
-        progressFill.className = `progress-fill ${newLvlClass}`;
-        const pct = Math.min(100, (newLevel / maxGoal) * 100);
+        const progressFill = document.createElement('div');
+        const level = levels[instIdx] || 0;
+        const lvlClass = getLevelClass(level, currentBuilding);
+        progressFill.className = `progress-fill ${lvlClass}`;
+        const pct = Math.min(100, (level / maxGoal) * 100);
         progressFill.style.width = `${pct}%`;
-        
-        saveData();
-        renderMetaSummary();
-        // Actualizar etiqueta de coste
-        if (costEl) {
-          const updatedCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
-          if (updatedCost) {
-            costEl.innerHTML = `
-              <span class="res-chip ${updatedCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${updatedCost.wood.toLocaleString()}">
-                <img src="assets/resources/wood.png" alt="Madera">
-                <span>${formatResNum(updatedCost.wood)}</span>
+        progressContainer.appendChild(progressFill);
+        instRow.appendChild(progressContainer);
+
+        // Coste para el siguiente nivel
+        const cost = getBuildingUpgradeCost(currentBuilding.name, level, city);
+        let costEl = null;
+        if (cost) {
+          costEl = document.createElement('div');
+          costEl.className = 'building-cost-tag';
+          costEl.innerHTML = `
+            <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${cost.wood.toLocaleString()}">
+              <img src="assets/resources/wood.png" alt="Madera">
+              <span>${formatResNum(cost.wood)}</span>
+            </span>
+          `;
+          if (cost.marble > 0) {
+            costEl.innerHTML += `
+              <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${cost.marble.toLocaleString()}">
+                <img src="assets/resources/marble.png" alt="Mármol">
+                <span>${formatResNum(cost.marble)}</span>
               </span>
             `;
-            if (updatedCost.marble > 0) {
-              costEl.innerHTML += `
-                <span class="res-chip ${updatedCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${updatedCost.marble.toLocaleString()}">
-                  <img src="assets/resources/marble.png" alt="Mármol">
-                  <span>${formatResNum(updatedCost.marble)}</span>
+          }
+          instRow.appendChild(costEl);
+        }
+
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+
+        if (isEditing) {
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.className = 'level-input';
+          input.min = '0';
+          input.value = level;
+          input.setAttribute('data-city', city);
+          input.setAttribute('data-inst-idx', instIdx);
+          controls.appendChild(input);
+        } else {
+          const minusBtn = document.createElement('button');
+          minusBtn.className = 'btn';
+          minusBtn.textContent = '-';
+
+          const badge = document.createElement('div');
+          badge.className = `level-badge ${lvlClass}`;
+          badge.textContent = level;
+
+          const plusBtn = document.createElement('button');
+          plusBtn.className = 'btn';
+          plusBtn.textContent = '+';
+
+          const updateMultiUI = (newLevel) => {
+            levels[instIdx] = newLevel;
+            appData[city][currentBuilding.name] = levels;
+            badge.textContent = newLevel;
+            const newLvlClass = getLevelClass(newLevel, currentBuilding);
+            badge.className = `level-badge ${newLvlClass}`;
+            progressFill.className = `progress-fill ${newLvlClass}`;
+            progressFill.style.width = `${Math.min(100, (newLevel / maxGoal) * 100)}%`;
+            saveData();
+            renderMetaSummary();
+            if (costEl) {
+              const uCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
+              if (uCost) {
+                costEl.innerHTML = `
+                  <span class="res-chip ${uCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${uCost.wood.toLocaleString()}">
+                    <img src="assets/resources/wood.png" alt="Madera">
+                    <span>${formatResNum(uCost.wood)}</span>
+                  </span>
+                `;
+                if (uCost.marble > 0) {
+                  costEl.innerHTML += `
+                    <span class="res-chip ${uCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${uCost.marble.toLocaleString()}">
+                      <img src="assets/resources/marble.png" alt="Mármol">
+                      <span>${formatResNum(uCost.marble)}</span>
+                    </span>
+                  `;
+                }
+              }
+            }
+          };
+
+          minusBtn.onclick = () => {
+            if (levels[instIdx] > 0) updateMultiUI(levels[instIdx] - 1);
+          };
+          plusBtn.onclick = () => {
+            updateMultiUI(levels[instIdx] + 1);
+          };
+
+          controls.appendChild(minusBtn);
+          controls.appendChild(badge);
+          controls.appendChild(plusBtn);
+        }
+
+        instRow.appendChild(controls);
+        instancesList.appendChild(instRow);
+      });
+
+      row.appendChild(instancesList);
+    } else {
+      // Edificio normal
+      row.className = 'city-row';
+      
+      const cityInfo = document.createElement('div');
+      cityInfo.className = 'city-info';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'city-name';
+      nameSpan.textContent = shortCode;
+      nameSpan.title = fullName;
+      
+      const progressContainer = document.createElement('div');
+      progressContainer.className = 'progress-container';
+      
+      const progressFill = document.createElement('div');
+      const level = appData[city]?.[currentBuilding.name] || 0;
+      const lvlClass = getLevelClass(level, currentBuilding);
+      progressFill.className = `progress-fill ${lvlClass}`;
+      
+      const percentage = Math.min(100, (level / maxGoal) * 100);
+      progressFill.style.width = `${percentage}%`;
+      progressContainer.appendChild(progressFill);
+      
+      const cost = getBuildingUpgradeCost(currentBuilding.name, level, city);
+      let costEl = null;
+      if (cost) {
+        costEl = document.createElement('div');
+        costEl.className = 'building-cost-tag';
+        costEl.innerHTML = `
+          <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${cost.wood.toLocaleString()}">
+            <img src="assets/resources/wood.png" alt="Madera">
+            <span>${formatResNum(cost.wood)}</span>
+          </span>
+        `;
+        if (cost.marble > 0) {
+          costEl.innerHTML += `
+            <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${cost.marble.toLocaleString()}">
+              <img src="assets/resources/marble.png" alt="Mármol">
+              <span>${formatResNum(cost.marble)}</span>
+            </span>
+          `;
+        }
+      }
+      
+      cityInfo.appendChild(nameSpan);
+      cityInfo.appendChild(progressContainer);
+      if (costEl) cityInfo.appendChild(costEl);
+      
+      const controls = document.createElement('div');
+      controls.className = 'controls';
+      
+      if (isEditing) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'level-input';
+        input.min = '0';
+        input.value = level;
+        input.setAttribute('data-city', city);
+        controls.appendChild(input);
+      } else {
+        const minusBtn = document.createElement('button');
+        minusBtn.className = 'btn';
+        minusBtn.textContent = '-';
+        
+        const badge = document.createElement('div');
+        badge.className = `level-badge ${lvlClass}`;
+        badge.textContent = level;
+        
+        const plusBtn = document.createElement('button');
+        plusBtn.className = 'btn';
+        plusBtn.textContent = '+';
+        
+        const updateUI = (newLevel) => {
+          appData[city][currentBuilding.name] = newLevel;
+          badge.textContent = newLevel;
+          
+          const newLvlClass = getLevelClass(newLevel, currentBuilding);
+          badge.className = `level-badge ${newLvlClass}`;
+          
+          progressFill.className = `progress-fill ${newLvlClass}`;
+          const pct = Math.min(100, (newLevel / maxGoal) * 100);
+          progressFill.style.width = `${pct}%`;
+          
+          saveData();
+          renderMetaSummary();
+          if (costEl) {
+            const updatedCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
+            if (updatedCost) {
+              costEl.innerHTML = `
+                <span class="res-chip ${updatedCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${updatedCost.wood.toLocaleString()}">
+                  <img src="assets/resources/wood.png" alt="Madera">
+                  <span>${formatResNum(updatedCost.wood)}</span>
                 </span>
               `;
+              if (updatedCost.marble > 0) {
+                costEl.innerHTML += `
+                  <span class="res-chip ${updatedCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${updatedCost.marble.toLocaleString()}">
+                    <img src="assets/resources/marble.png" alt="Mármol">
+                    <span>${formatResNum(updatedCost.marble)}</span>
+                  </span>
+                `;
+              }
             }
           }
-        }
-      };
+        };
+        
+        minusBtn.onclick = () => {
+          let currentLvl = appData[city][currentBuilding.name] || 0;
+          if (currentLvl > 0) updateUI(currentLvl - 1);
+        };
+        
+        plusBtn.onclick = () => {
+          let currentLvl = appData[city][currentBuilding.name] || 0;
+          updateUI(currentLvl + 1);
+        };
+        
+        controls.appendChild(minusBtn);
+        controls.appendChild(badge);
+        controls.appendChild(plusBtn);
+      }
       
-      minusBtn.onclick = () => {
-        let currentLvl = appData[city][currentBuilding.name] || 0;
-        if (currentLvl > 0) updateUI(currentLvl - 1);
-      };
-      
-      plusBtn.onclick = () => {
-        let currentLvl = appData[city][currentBuilding.name] || 0;
-        updateUI(currentLvl + 1);
-      };
-      
-      controls.appendChild(minusBtn);
-      controls.appendChild(badge);
-      controls.appendChild(plusBtn);
+      row.appendChild(cityInfo);
+      row.appendChild(controls);
     }
-    
-    row.appendChild(cityInfo);
-    row.appendChild(controls);
     
     newContent.appendChild(row);
   });
@@ -528,7 +675,17 @@ function setupEditButton() {
         const city = input.getAttribute('data-city');
         const val = parseInt(input.value, 10);
         const cleanVal = isNaN(val) ? 0 : Math.max(0, val);
-        appData[city][currentBuilding.name] = cleanVal;
+        const instIdxAttr = input.getAttribute('data-inst-idx');
+
+        if (instIdxAttr !== null) {
+          const instIdx = parseInt(instIdxAttr, 10);
+          if (!Array.isArray(appData[city][currentBuilding.name])) {
+            appData[city][currentBuilding.name] = [0, 0];
+          }
+          appData[city][currentBuilding.name][instIdx] = cleanVal;
+        } else {
+          appData[city][currentBuilding.name] = cleanVal;
+        }
       });
       
       isEditing = false;
@@ -544,7 +701,120 @@ function setupEditButton() {
 }
 
 // ========================================================
-// LÓGICA DE TROPAS
+// VISTA: RESUMEN (PRÓXIMAS 6 CONSTRUCCIONES PRIORITARIAS)
+// ========================================================
+function renderSummary() {
+  const container = document.getElementById('summary-cards-container');
+  container.innerHTML = '';
+
+  const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
+  const candidateTasks = [];
+
+  // Excluir Intendencia y seguir orden a partir de Depósito
+  const priorityBuildings = buildingsConfig.filter(b => b.name !== "Intendencia");
+
+  for (const building of priorityBuildings) {
+    const targetIdx = getActiveTargetIndex(building);
+    const targetKey = metaKeys[targetIdx];
+    const targetValue = building[targetKey];
+
+    for (let cIdx = 0; cIdx < activeCityCount; cIdx++) {
+      const city = cities[cIdx];
+      const val = appData[city]?.[building.name];
+
+      if (building.isMulti && Array.isArray(val)) {
+        val.forEach((instLvl, instIdx) => {
+          if (instLvl < targetValue) {
+            candidateTasks.push({
+              buildingName: `${building.name} (D${instIdx + 1})`,
+              rawBuildingName: building.name,
+              city: city,
+              currentLevel: instLvl,
+              targetLevel: targetValue,
+              cost: getBuildingUpgradeCost(building.name, instLvl, city)
+            });
+          }
+        });
+      } else {
+        const curLvl = val || 0;
+        if (curLvl < targetValue) {
+          candidateTasks.push({
+            buildingName: building.name,
+            rawBuildingName: building.name,
+            city: city,
+            currentLevel: curLvl,
+            targetLevel: targetValue,
+            cost: getBuildingUpgradeCost(building.name, curLvl, city)
+          });
+        }
+      }
+
+      if (candidateTasks.length >= 6) break;
+    }
+    if (candidateTasks.length >= 6) break;
+  }
+
+  if (candidateTasks.length === 0) {
+    container.innerHTML = `
+      <div class="no-troops-msg">
+        <p>🎉 ¡Todas las ciudades han alcanzado las metas actuales en los edificios prioritarios!</p>
+      </div>
+    `;
+    return;
+  }
+
+  candidateTasks.forEach((task, idx) => {
+    const card = document.createElement('div');
+    card.className = 'summary-card-item';
+
+    const label = cityLabels[task.city];
+    const cityCode = (label && label.abbr) ? label.abbr : task.city.replace('Tenochtitlan-', '');
+    const cityName = (label && label.name) ? label.name : task.city;
+
+    const left = document.createElement('div');
+    left.className = 'summary-card-left';
+    left.innerHTML = `
+      <div>
+        <span class="summary-rank-badge">#${idx + 1}</span>
+        <span class="summary-b-name">${task.buildingName}</span>
+      </div>
+      <div class="summary-city-name">${cityCode} (${cityName})</div>
+    `;
+
+    const right = document.createElement('div');
+    right.className = 'summary-card-right';
+    
+    let costHtml = '';
+    if (task.cost) {
+      costHtml = `
+        <div class="building-cost-tag">
+          <span class="res-chip ${task.cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${task.cost.wood.toLocaleString()}">
+            <img src="assets/resources/wood.png" alt="Madera">
+            <span>${formatResNum(task.cost.wood)}</span>
+          </span>
+          ${task.cost.marble > 0 ? `
+            <span class="res-chip ${task.cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${task.cost.marble.toLocaleString()}">
+              <img src="assets/resources/marble.png" alt="Mármol">
+              <span>${formatResNum(task.cost.marble)}</span>
+            </span>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    right.innerHTML = `
+      <div class="summary-levels">Nivel ${task.currentLevel} ➔ ${task.targetLevel}</div>
+      ${costHtml}
+    `;
+
+    card.appendChild(left);
+    card.appendChild(right);
+    container.appendChild(card);
+  });
+}
+
+// ========================================================
+// VISTA: TROPAS (2 POR LÍNEA, FILTRADAS, MODALES + Y ACTUALIZAR)
 // ========================================================
 function renderTroopCityTabs() {
   const container = document.getElementById('troops-city-tabs');
@@ -568,7 +838,6 @@ function renderTroopCityTabs() {
     tab.textContent = shortCode;
     tab.title = fullName;
 
-    // Botón para desvincular ciudad de vista de tropas
     const closeBtn = document.createElement('span');
     closeBtn.className = 'troop-city-close';
     closeBtn.innerHTML = '&times;';
@@ -624,14 +893,20 @@ function renderTroopsContent() {
   }
   const cityTroops = troopsData.cities[city][typeKey];
 
-  // Cálculo de totales necesarios para la ciudad
+  // FILTRO: "tropas que no existen, tropas que no aparecen"
+  const visibleTroops = list.filter(unit => {
+    const data = cityTroops[unit.id];
+    return data && ((data.actual && data.actual > 0) || (data.desired && data.desired > 0));
+  });
+
+  // Cálculo de totales faltantes
   let totalMissingWood = 0;
   let totalMissingSulfur = 0;
   let totalMissingCrystal = 0;
   let totalMissingWine = 0;
 
-  list.forEach(unit => {
-    const data = cityTroops[unit.id] || { actual: 0, desired: 0 };
+  visibleTroops.forEach(unit => {
+    const data = cityTroops[unit.id];
     const missing = Math.max(0, (data.desired || 0) - (data.actual || 0));
     if (missing > 0) {
       const cost = getUnitCostInCity(unit, city);
@@ -642,7 +917,7 @@ function renderTroopsContent() {
     }
   });
 
-  // Tarjeta de resumen de materiales faltantes
+  // Tarjeta de resumen
   const summaryCard = document.createElement('div');
   summaryCard.className = 'troop-summary-card';
   const label = cityLabels[city];
@@ -679,14 +954,23 @@ function renderTroopsContent() {
   `;
   container.appendChild(summaryCard);
 
-  // Lista de Tropas / Barcos
+  if (visibleTroops.length === 0) {
+    const emptyNotice = document.createElement('div');
+    emptyNotice.className = 'no-troops-msg';
+    emptyNotice.innerHTML = `
+      <p>No hay tropas registradas en esta ciudad.</p>
+      <button id="btn-add-troops-empty" class="btn-action primary" style="max-width:160px;margin:10px auto;">+ Añadir Tropa</button>
+    `;
+    container.appendChild(emptyNotice);
+    document.getElementById('btn-add-troops-empty').onclick = openAddTroopsModal;
+    return;
+  }
+
+  // Cuadrícula 2 por línea
   const grid = document.createElement('div');
   grid.className = 'troop-grid';
 
-  list.forEach(unit => {
-    if (!cityTroops[unit.id]) {
-      cityTroops[unit.id] = { actual: 0, desired: 0 };
-    }
+  visibleTroops.forEach(unit => {
     const unitData = cityTroops[unit.id];
     const cost = getUnitCostInCity(unit, city);
     const missing = Math.max(0, (unitData.desired || 0) - (unitData.actual || 0));
@@ -694,130 +978,58 @@ function renderTroopsContent() {
     const card = document.createElement('div');
     card.className = 'troop-card';
 
-    // Icono
-    const iconContainer = document.createElement('div');
-    iconContainer.className = 'troop-icon-container';
-    const img = document.createElement('img');
-    img.src = unit.icon;
-    img.alt = unit.name;
-    iconContainer.appendChild(img);
+    // Cabecera compacta: Icono + Nombre
+    const header = document.createElement('div');
+    header.className = 'troop-card-header';
+    header.innerHTML = `
+      <div class="troop-icon-container">
+        <img src="${unit.icon}" alt="${unit.name}">
+      </div>
+      <span class="troop-name" title="${unit.name}">${unit.name}</span>
+    `;
 
-    // Detalles
-    const details = document.createElement('div');
-    details.className = 'troop-details';
+    // Controles: Real y Meta
+    const controls = document.createElement('div');
+    controls.className = 'troop-controls-compact';
 
-    // Fila superior: Nombre de la tropa
-    const titleRow = document.createElement('div');
-    titleRow.className = 'troop-title-row';
-    const nameEl = document.createElement('span');
-    nameEl.className = 'troop-name';
-    nameEl.textContent = unit.name;
-    titleRow.appendChild(nameEl);
-
-    // Fila de controles: Actual, Cola (+), Deseado
-    const inputsRow = document.createElement('div');
-    inputsRow.className = 'troop-inputs-row';
-
-    // Actual
-    const actualGroup = document.createElement('div');
-    actualGroup.className = 'troop-group';
-    actualGroup.innerHTML = `<span class="troop-group-label">Real:</span>`;
-    
-    const minusBtn = document.createElement('button');
-    minusBtn.className = 'troop-btn-tiny';
-    minusBtn.textContent = '-';
-    
-    const actualInput = document.createElement('input');
-    actualInput.type = 'number';
-    actualInput.className = 'troop-input-num';
-    actualInput.min = '0';
-    actualInput.value = unitData.actual;
-
-    const plusBtn = document.createElement('button');
-    plusBtn.className = 'troop-btn-tiny';
-    plusBtn.textContent = '+';
-
-    const saveAndRefresh = () => {
+    // Fila Real
+    const rowReal = document.createElement('div');
+    rowReal.className = 'troop-field-row';
+    rowReal.innerHTML = `<label>Real:</label>`;
+    const inputReal = document.createElement('input');
+    inputReal.type = 'number';
+    inputReal.className = 'troop-input-num';
+    inputReal.min = '0';
+    inputReal.value = unitData.actual || 0;
+    inputReal.onchange = () => {
+      const val = parseInt(inputReal.value, 10);
+      unitData.actual = isNaN(val) ? 0 : Math.max(0, val);
       saveTroopsData();
       renderTroopsContent();
     };
+    rowReal.appendChild(inputReal);
 
-    minusBtn.onclick = () => {
-      if (unitData.actual > 0) {
-        unitData.actual--;
-        saveAndRefresh();
-      }
-    };
-    plusBtn.onclick = () => {
-      unitData.actual++;
-      saveAndRefresh();
-    };
-    actualInput.onchange = () => {
-      const val = parseInt(actualInput.value, 10);
-      unitData.actual = isNaN(val) ? 0 : Math.max(0, val);
-      saveAndRefresh();
-    };
-
-    actualGroup.appendChild(minusBtn);
-    actualGroup.appendChild(actualInput);
-    actualGroup.appendChild(plusBtn);
-
-    // Botón Agregar cola (+ entrenar)
-    const queueBox = document.createElement('div');
-    queueBox.className = 'troop-queue-box';
-    queueBox.title = 'Agregar tropas que están entrenando en cuartel/astillero';
-    
-    const queueInput = document.createElement('input');
-    queueInput.type = 'number';
-    queueInput.className = 'troop-queue-input';
-    queueInput.placeholder = '+cola';
-    queueInput.min = '1';
-
-    const queueAddBtn = document.createElement('button');
-    queueAddBtn.className = 'troop-btn-tiny';
-    queueAddBtn.textContent = '+';
-    queueAddBtn.title = 'Sumar a las reales';
-
-    const applyQueue = () => {
-      const addVal = parseInt(queueInput.value, 10);
-      if (!isNaN(addVal) && addVal > 0) {
-        unitData.actual += addVal;
-        queueInput.value = '';
-        saveAndRefresh();
-      }
-    };
-
-    queueAddBtn.onclick = applyQueue;
-    queueInput.onkeydown = (e) => {
-      if (e.key === 'Enter') applyQueue();
-    };
-
-    queueBox.appendChild(queueInput);
-    queueBox.appendChild(queueAddBtn);
-
-    // Deseado
-    const desiredGroup = document.createElement('div');
-    desiredGroup.className = 'troop-group';
-    desiredGroup.innerHTML = `<span class="troop-group-label">Meta:</span>`;
-
-    const desiredInput = document.createElement('input');
-    desiredInput.type = 'number';
-    desiredInput.className = 'troop-input-num';
-    desiredInput.min = '0';
-    desiredInput.value = unitData.desired;
-    desiredInput.onchange = () => {
-      const val = parseInt(desiredInput.value, 10);
+    // Fila Meta
+    const rowMeta = document.createElement('div');
+    rowMeta.className = 'troop-field-row';
+    rowMeta.innerHTML = `<label>Meta:</label>`;
+    const inputMeta = document.createElement('input');
+    inputMeta.type = 'number';
+    inputMeta.className = 'troop-input-num';
+    inputMeta.min = '0';
+    inputMeta.value = unitData.desired || 0;
+    inputMeta.onchange = () => {
+      const val = parseInt(inputMeta.value, 10);
       unitData.desired = isNaN(val) ? 0 : Math.max(0, val);
-      saveAndRefresh();
+      saveTroopsData();
+      renderTroopsContent();
     };
+    rowMeta.appendChild(inputMeta);
 
-    desiredGroup.appendChild(desiredInput);
+    controls.appendChild(rowReal);
+    controls.appendChild(rowMeta);
 
-    inputsRow.appendChild(actualGroup);
-    inputsRow.appendChild(queueBox);
-    inputsRow.appendChild(desiredGroup);
-
-    // Fila de recursos faltantes para esta unidad
+    // Recursos faltantes
     const neededResRow = document.createElement('div');
     neededResRow.className = 'troop-needed-res';
 
@@ -858,19 +1070,162 @@ function renderTroopsContent() {
         `;
       }
     } else {
-      neededResRow.innerHTML = `<span style="color:#2e7d32;font-size:10px;font-weight:bold;">✔️ Objetivo completado</span>`;
+      neededResRow.innerHTML = `<span style="color:#2e7d32;font-size:9px;font-weight:bold;">✔️ Meta lista</span>`;
     }
 
-    details.appendChild(titleRow);
-    details.appendChild(inputsRow);
-    details.appendChild(neededResRow);
-
-    card.appendChild(iconContainer);
-    card.appendChild(details);
+    card.appendChild(header);
+    card.appendChild(controls);
+    card.appendChild(neededResRow);
     grid.appendChild(card);
   });
 
   container.appendChild(grid);
+}
+
+// Modal: Añadir Tropas (Catálogo completo de la categoría actual)
+function openAddTroopsModal() {
+  const city = troopsData.activeTroopCity;
+  if (!city) return;
+
+  const modal = document.getElementById('modal-add-troops');
+  const title = document.getElementById('modal-add-troops-title');
+  const container = document.getElementById('add-troops-catalog-list');
+  container.innerHTML = '';
+
+  const isUnits = troopsData.activeTroopType === "units";
+  title.textContent = isUnits ? "Añadir Tropas Terrestres" : "Añadir Barcos de Guerra";
+
+  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
+  const cityTroops = troopsData.cities[city]?.[troopsData.activeTroopType] || {};
+
+  const tempInputs = {};
+
+  list.forEach(unit => {
+    const existing = cityTroops[unit.id] || { actual: 0, desired: 0 };
+    const row = document.createElement('div');
+    row.className = 'troop-modal-row';
+
+    row.innerHTML = `
+      <div class="troop-modal-row-left">
+        <img src="${unit.icon}" alt="${unit.name}">
+        <span>${unit.name}</span>
+      </div>
+    `;
+
+    const inputsDiv = document.createElement('div');
+    inputsDiv.className = 'troop-modal-inputs';
+
+    inputsDiv.innerHTML = `<label>Real:</label>`;
+    const actInp = document.createElement('input');
+    actInp.type = 'number';
+    actInp.className = 'troop-input-num';
+    actInp.min = '0';
+    actInp.value = existing.actual || 0;
+
+    inputsDiv.innerHTML += `<label style="margin-left:4px;">Meta:</label>`;
+    const desInp = document.createElement('input');
+    desInp.type = 'number';
+    desInp.className = 'troop-input-num';
+    desInp.min = '0';
+    desInp.value = existing.desired || 0;
+
+    inputsDiv.appendChild(actInp);
+    inputsDiv.appendChild(desInp);
+    row.appendChild(inputsDiv);
+    container.appendChild(row);
+
+    tempInputs[unit.id] = { actInp, desInp };
+  });
+
+  document.getElementById('btn-save-add-troops').onclick = () => {
+    if (!troopsData.cities[city]) troopsData.cities[city] = { units: {}, ships: {} };
+    if (!troopsData.cities[city][troopsData.activeTroopType]) {
+      troopsData.cities[city][troopsData.activeTroopType] = {};
+    }
+    const targetMap = troopsData.cities[city][troopsData.activeTroopType];
+
+    list.forEach(unit => {
+      const actVal = parseInt(tempInputs[unit.id].actInp.value, 10);
+      const desVal = parseInt(tempInputs[unit.id].desInp.value, 10);
+      targetMap[unit.id] = {
+        actual: isNaN(actVal) ? 0 : Math.max(0, actVal),
+        desired: isNaN(desVal) ? 0 : Math.max(0, desVal)
+      };
+    });
+
+    saveTroopsData();
+    renderTroopsContent();
+    modal.classList.add('hidden');
+  };
+
+  modal.classList.remove('hidden');
+}
+
+// Modal: Actualizar Tropas (Solo existentes para post-batalla)
+function openUpdateTroopsModal() {
+  const city = troopsData.activeTroopCity;
+  if (!city) return;
+
+  const modal = document.getElementById('modal-update-troops');
+  const title = document.getElementById('modal-update-troops-title');
+  const container = document.getElementById('update-troops-active-list');
+  container.innerHTML = '';
+
+  title.textContent = `Actualizar Tropas en ${cityLabels[city]?.name || city}`;
+
+  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
+  const cityTroops = troopsData.cities[city]?.[troopsData.activeTroopType] || {};
+
+  // Solo mostrar tropas que tienen actual > 0 o meta > 0
+  const activeList = list.filter(u => cityTroops[u.id] && ((cityTroops[u.id].actual > 0) || (cityTroops[u.id].desired > 0)));
+
+  if (activeList.length === 0) {
+    container.innerHTML = `<p style="padding:10px;text-align:center;font-size:11px;color:#666;">No hay tropas registradas en esta ciudad aún. Usa "+ Tropa" primero.</p>`;
+  }
+
+  const tempInputs = {};
+
+  activeList.forEach(unit => {
+    const existing = cityTroops[unit.id] || { actual: 0, desired: 0 };
+    const row = document.createElement('div');
+    row.className = 'troop-modal-row';
+
+    row.innerHTML = `
+      <div class="troop-modal-row-left">
+        <img src="${unit.icon}" alt="${unit.name}">
+        <span>${unit.name}</span>
+      </div>
+    `;
+
+    const inputsDiv = document.createElement('div');
+    inputsDiv.className = 'troop-modal-inputs';
+    inputsDiv.innerHTML = `<label>Quedan:</label>`;
+
+    const actInp = document.createElement('input');
+    actInp.type = 'number';
+    actInp.className = 'troop-input-num';
+    actInp.min = '0';
+    actInp.value = existing.actual || 0;
+
+    inputsDiv.appendChild(actInp);
+    row.appendChild(inputsDiv);
+    container.appendChild(row);
+
+    tempInputs[unit.id] = actInp;
+  });
+
+  document.getElementById('btn-save-update-troops').onclick = () => {
+    activeList.forEach(unit => {
+      const actVal = parseInt(tempInputs[unit.id].value, 10);
+      cityTroops[unit.id].actual = isNaN(actVal) ? 0 : Math.max(0, actVal);
+    });
+
+    saveTroopsData();
+    renderTroopsContent();
+    modal.classList.add('hidden');
+  };
+
+  modal.classList.remove('hidden');
 }
 
 function openTroopCityModal() {
@@ -920,33 +1275,53 @@ function openTroopCityModal() {
   modal.classList.remove('hidden');
 }
 
-function setupTroopsNavigation() {
-  // Pestañas principales (Construcción / Tropas)
+// Configurar navegación superior de 4 pestañas
+function setupNavigation() {
+  const navSummary = document.getElementById('nav-btn-summary');
   const navConstruction = document.getElementById('nav-btn-construction');
   const navTroops = document.getElementById('nav-btn-troops');
+  const navSettings = document.getElementById('nav-btn-settings');
+
+  const viewSummary = document.getElementById('view-summary');
   const viewConstruction = document.getElementById('view-construction');
   const viewTroops = document.getElementById('view-troops');
+  const viewSettings = document.getElementById('view-settings');
   const btnEdit = document.getElementById('btn-edit');
 
-  navConstruction.onclick = () => {
-    currentView = "construction";
-    navConstruction.classList.add('active');
-    navTroops.classList.remove('active');
-    viewConstruction.classList.remove('hidden');
-    viewTroops.classList.add('hidden');
-    btnEdit.style.display = 'flex';
+  const switchView = (targetView) => {
+    currentView = targetView;
+    [navSummary, navConstruction, navTroops, navSettings].forEach(b => b.classList.remove('active'));
+    [viewSummary, viewConstruction, viewTroops, viewSettings].forEach(v => v.classList.add('hidden'));
+
+    btnEdit.style.display = (targetView === 'construction') ? 'flex' : 'none';
+
+    if (targetView === 'summary') {
+      navSummary.classList.add('active');
+      viewSummary.classList.remove('hidden');
+      renderSummary();
+    } else if (targetView === 'construction') {
+      navConstruction.classList.add('active');
+      viewConstruction.classList.remove('hidden');
+      renderTabs();
+      renderMetaSummary();
+      renderContent();
+    } else if (targetView === 'troops') {
+      navTroops.classList.add('active');
+      viewTroops.classList.remove('hidden');
+      renderTroopCityTabs();
+      renderTroopsContent();
+    } else if (targetView === 'settings') {
+      navSettings.classList.add('active');
+      viewSettings.classList.remove('hidden');
+      document.getElementById('input-city-count').value = activeCityCount;
+      populateCityRenameList();
+    }
   };
 
-  navTroops.onclick = () => {
-    currentView = "troops";
-    navTroops.classList.add('active');
-    navConstruction.classList.remove('active');
-    viewTroops.classList.remove('hidden');
-    viewConstruction.classList.add('hidden');
-    btnEdit.style.display = 'none'; // El lápiz es para niveles de edificios
-    renderTroopCityTabs();
-    renderTroopsContent();
-  };
+  navSummary.onclick = () => switchView('summary');
+  navConstruction.onclick = () => switchView('construction');
+  navTroops.onclick = () => switchView('troops');
+  navSettings.onclick = () => switchView('settings');
 
   // Subpestañas Tropas (Unidades / Barcos)
   const subtabUnits = document.getElementById('troops-subtab-units');
@@ -968,14 +1343,24 @@ function setupTroopsNavigation() {
     renderTroopsContent();
   };
 
-  // Botón + Ciudad modal
+  // Botones de acción en Tropas
   document.getElementById('btn-add-troop-city').onclick = openTroopCityModal;
   document.getElementById('btn-close-troop-city-modal').onclick = () => {
     document.getElementById('troop-city-modal').classList.add('hidden');
   };
+
+  document.getElementById('btn-open-add-troops-modal').onclick = openAddTroopsModal;
+  document.getElementById('btn-close-add-troops-modal').onclick = () => {
+    document.getElementById('modal-add-troops').classList.add('hidden');
+  };
+
+  document.getElementById('btn-open-update-troops-modal').onclick = openUpdateTroopsModal;
+  document.getElementById('btn-close-update-troops-modal').onclick = () => {
+    document.getElementById('modal-update-troops').classList.add('hidden');
+  };
 }
 
-// Configuración general
+// Configuración y gestión de nombres de ciudades
 function populateCityRenameList() {
   const container = document.getElementById('city-rename-list');
   container.innerHTML = '';
@@ -1024,25 +1409,12 @@ function populateCityRenameList() {
   });
 }
 
-function setupSettingsButton() {
-  const btnSettings = document.getElementById('btn-settings');
-  const overlay = document.getElementById('settings-overlay');
-  const btnClose = document.getElementById('btn-close-settings');
+function setupSettingsHandlers() {
   const btnExport = document.getElementById('btn-export');
   const btnImport = document.getElementById('btn-import');
   const txtBackup = document.getElementById('txt-backup');
   const backupStatus = document.getElementById('backup-status');
-  
-  btnSettings.onclick = () => {
-    overlay.classList.remove('hidden');
-    document.getElementById('input-city-count').value = activeCityCount;
-    populateCityRenameList();
-    txtBackup.classList.add('hidden');
-    txtBackup.value = '';
-    backupStatus.textContent = '';
-    backupStatus.className = 'status-msg';
-  };
-  
+
   document.getElementById('btn-apply-city-count').onclick = () => {
     const input = document.getElementById('input-city-count');
     const val = parseInt(input.value, 10);
@@ -1057,16 +1429,13 @@ function setupSettingsButton() {
     }
   };
 
-  const applyAndClose = () => {
+  document.getElementById('btn-save-cities').onclick = () => {
     saveCityLabels();
     renderContent();
     renderTroopCityTabs();
     renderTroopsContent();
-    overlay.classList.add('hidden');
+    showBackupStatus("¡Nombres de ciudades guardados!", true);
   };
-
-  btnClose.onclick = applyAndClose;
-  document.getElementById('btn-save-cities').onclick = applyAndClose;
   
   btnExport.onclick = () => {
     const dataToExport = {
@@ -1129,9 +1498,6 @@ function setupSettingsButton() {
         renderTroopCityTabs();
         renderTroopsContent();
         showBackupStatus("¡Datos importados con éxito!", true);
-        setTimeout(() => {
-          overlay.classList.add('hidden');
-        }, 1500);
       });
       
     } catch (err) {
@@ -1155,11 +1521,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   loadData(() => {
+    setupNavigation();
+    setupEditButton();
+    setupSettingsHandlers();
     renderTabs();
     renderMetaSummary();
     renderContent();
-    setupEditButton();
-    setupSettingsButton();
-    setupTroopsNavigation();
   });
 });

@@ -8,8 +8,19 @@
 <body>
   <!-- Navegación Principal Global -->
   <div class="main-nav">
+    <button id="nav-btn-summary" class="nav-btn">📋 Resumen</button>
     <button id="nav-btn-construction" class="nav-btn active">🏛️ Construcción</button>
     <button id="nav-btn-troops" class="nav-btn">⚔️ Tropas</button>
+    <button id="nav-btn-settings" class="nav-btn">⚙️ Configuración</button>
+  </div>
+
+  <!-- Vista: Resumen de Construcción -->
+  <div id="view-summary" class="view-panel hidden">
+    <div class="summary-header">
+      <h2>Próximas 6 Construcciones</h2>
+      <p class="section-desc">Prioridad por orden de edificios y metas activas (excluye Intendencia).</p>
+    </div>
+    <div id="summary-cards-container" class="summary-cards-list"></div>
   </div>
 
   <!-- Vista: Construcción -->
@@ -26,7 +37,11 @@
         <button id="troops-subtab-units" class="troops-subtab active">Unidades</button>
         <button id="troops-subtab-ships" class="troops-subtab">Barcos</button>
       </div>
-      <button id="btn-add-troop-city" class="btn-action primary" title="Añadir ciudad a la vista de tropas">+ Ciudad</button>
+      <div class="troops-actions-bar">
+        <button id="btn-add-troop-city" class="btn-action" title="Añadir ciudad a la vista militar">+ Ciudad</button>
+        <button id="btn-open-add-troops-modal" class="btn-action primary" title="Añadir tropas a esta ciudad">+ Tropa</button>
+        <button id="btn-open-update-troops-modal" class="btn-action" title="Actualizar tropas tras batalla">⚡ Actualizar</button>
+      </div>
     </div>
     
     <!-- Pestañas horizontales de ciudades en tropas -->
@@ -36,9 +51,44 @@
     <div class="troops-content" id="troops-content"></div>
   </div>
 
+  <!-- Vista: Configuración -->
+  <div id="view-settings" class="view-panel hidden">
+    <div class="settings-view-container">
+      <!-- Copia de seguridad (Importar/Exportar) -->
+      <div class="settings-section">
+        <h3>Copia de Seguridad</h3>
+        <p class="section-desc">Copia tus datos actuales o importa una copia existente en formato JSON.</p>
+        <div class="backup-actions">
+          <button id="btn-export" class="btn-action">Exportar</button>
+          <button id="btn-import" class="btn-action">Importar</button>
+        </div>
+        <textarea id="txt-backup" class="backup-textarea hidden" placeholder="Pega el código JSON aquí para importar..."></textarea>
+        <div id="backup-status" class="status-msg"></div>
+      </div>
+      
+      <!-- Número de Ciudades -->
+      <div class="settings-section">
+        <h3>Número de Ciudades</h3>
+        <p class="section-desc">Cuántas ciudades tienes activas (máx 13). Las demás se ocultan.</p>
+        <div class="city-count-row">
+          <input id="input-city-count" type="number" min="1" max="13" value="13" class="city-count-input">
+          <button id="btn-apply-city-count" class="btn-action primary">Aplicar</button>
+        </div>
+      </div>
+      
+      <!-- Nombres de Ciudades -->
+      <div class="settings-section">
+        <h3>Nombres de Ciudades</h3>
+        <p class="section-desc">Personaliza el nombre completo y la abreviatura (máx 6 chars) que se muestra en las filas.</p>
+        <div id="city-rename-list" class="city-rename-list"></div>
+        <button id="btn-save-cities" class="btn-action primary" style="margin-top:8px;width:100%;">Guardar Nombres</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal para seleccionar y añadir ciudad a tropas -->
   <div id="troop-city-modal" class="overlay hidden">
-    <div class="overlay-content" style="max-height: 50%;">
+    <div class="overlay-content" style="max-height: 60%;">
       <div class="overlay-header">
         <h2>Añadir Ciudad a Tropas</h2>
         <button id="btn-close-troop-city-modal" class="close-btn">&times;</button>
@@ -49,51 +99,39 @@
       </div>
     </div>
   </div>
-  
-  <!-- Botón flotante de edición y configuración -->
-  <button id="btn-settings" class="floating-btn settings-btn" title="Configuración">⚙️</button>
-  <button id="btn-edit" class="floating-btn edit-mode-off" title="Editar niveles y checkpoints">✏️</button>
-  
-  <!-- Overlay de Configuración -->
-  <div id="settings-overlay" class="overlay hidden">
-    <div class="overlay-content">
+
+  <!-- Modal para Añadir Tropas a la Ciudad (Catálogo completo) -->
+  <div id="modal-add-troops" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 80%;">
       <div class="overlay-header">
-        <h2>Configuración</h2>
-        <button id="btn-close-settings" class="close-btn">&times;</button>
+        <h2 id="modal-add-troops-title">Añadir Tropas</h2>
+        <button id="btn-close-add-troops-modal" class="close-btn">&times;</button>
       </div>
       <div class="overlay-body">
-        <!-- Copia de seguridad (Importar/Exportar) -->
-        <div class="settings-section">
-          <h3>Copia de Seguridad</h3>
-          <p class="section-desc">Copia tus datos actuales o importa una copia existente en formato JSON.</p>
-          <div class="backup-actions">
-            <button id="btn-export" class="btn-action">Exportar</button>
-            <button id="btn-import" class="btn-action">Importar</button>
-          </div>
-          <textarea id="txt-backup" class="backup-textarea hidden" placeholder="Pega el código JSON aquí para importar..."></textarea>
-          <div id="backup-status" class="status-msg"></div>
-        </div>
-        
-        <!-- Número de Ciudades -->
-        <div class="settings-section">
-          <h3>Número de Ciudades</h3>
-          <p class="section-desc">Cuántas ciudades tienes activas (máx 13). Las demás se ocultan.</p>
-          <div class="city-count-row">
-            <input id="input-city-count" type="number" min="1" max="13" value="13" class="city-count-input">
-            <button id="btn-apply-city-count" class="btn-action primary">Aplicar</button>
-          </div>
-        </div>
-        
-        <!-- Nombres de Ciudades -->
-        <div class="settings-section">
-          <h3>Nombres de Ciudades</h3>
-          <p class="section-desc">Personaliza el nombre completo y la abreviatura (máx 6 chars) que se muestra en las filas.</p>
-          <div id="city-rename-list" class="city-rename-list"></div>
-          <button id="btn-save-cities" class="btn-action primary" style="margin-top:8px;width:100%;">Guardar Nombres</button>
-        </div>
+        <p class="section-desc">Indica la cantidad real o deseada para que aparezcan en la ciudad:</p>
+        <div id="add-troops-catalog-list" class="troop-modal-list"></div>
+        <button id="btn-save-add-troops" class="btn-action primary" style="margin-top:10px;width:100%;">Guardar Tropas</button>
       </div>
     </div>
   </div>
+
+  <!-- Modal para Actualizar Tropas (Solo existentes para post-batalla) -->
+  <div id="modal-update-troops" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 80%;">
+      <div class="overlay-header">
+        <h2 id="modal-update-troops-title">Actualizar Tropas Apostadas</h2>
+        <button id="btn-close-update-troops-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <p class="section-desc">Ajusta las cantidades reales de las tropas presentes en la ciudad:</p>
+        <div id="update-troops-active-list" class="troop-modal-list"></div>
+        <button id="btn-save-update-troops" class="btn-action primary" style="margin-top:10px;width:100%;">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Botón flotante de edición (solo activo en Construcción) -->
+  <button id="btn-edit" class="floating-btn edit-mode-off" title="Editar niveles y checkpoints">✏️</button>
   
   <script src="popup.js"></script>
 </body>
