@@ -7,12 +7,8 @@ const cities = [
 
 const DEFAULT_BUILDINGS = [
   { name: "Intendencia", meta1: 18, meta2: 28, meta3: 36, meta4: 42, meta5: 47, meta6: 49 },
-  { 
-    name: "Depósitos", 
-    isMulti: true, 
-    instances: ["Depósito 1", "Depósito 2"], 
-    meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 
-  },
+  { name: "Deposito 1", meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
+  { name: "Deposito 2", meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
   { name: "Oficina del Arquitecto", meta1: 16, meta2: 32, meta3: 50, meta4: 50, meta5: 50, meta6: 50 },
   { name: "Carpintería", meta1: 16, meta2: 32, meta3: 50, meta4: 50, meta5: 50, meta6: 50 },
   { name: "Materia Especial", meta1: 12, meta2: 24, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
@@ -24,13 +20,115 @@ const DEFAULT_BUILDINGS = [
   { name: "Museo", meta1: 10, meta2: 25, meta3: 40, meta4: 45, meta5: 50, meta6: 50 }
 ];
 
-let buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+const BUILDING_COSTS = {
+  "Intendencia": { baseWood: 40, factorWood: 1.28, baseMarble: 32, factorMarble: 1.28, marbleStartLvl: 5 },
+  "Deposito 1": { baseWood: 40, factorWood: 1.33, baseMarble: 32, factorMarble: 1.33, marbleStartLvl: 4 },
+  "Deposito 2": { baseWood: 40, factorWood: 1.33, baseMarble: 32, factorMarble: 1.33, marbleStartLvl: 4 },
+  "Oficina del Arquitecto": { baseWood: 91, factorWood: 1.17, baseMarble: 60, factorMarble: 1.17, marbleStartLvl: 1 },
+  "Carpintería": { baseWood: 66, factorWood: 1.17, baseMarble: 29, factorMarble: 1.17, marbleStartLvl: 1 },
+  "Materia Especial": { baseWood: 101, factorWood: 1.17, baseMarble: 43, factorMarble: 1.17, marbleStartLvl: 1 },
+  "Prensa de Vino": { baseWood: 89, factorWood: 1.17, baseMarble: 40, factorMarble: 1.17, marbleStartLvl: 1 },
+  "Aserradero": { baseWood: 206, factorWood: 1.17, baseMarble: 118, factorMarble: 1.17, marbleStartLvl: 1 },
+  "Taberna": { baseWood: 75, factorWood: 1.25, baseMarble: 12, factorMarble: 1.25, marbleStartLvl: 3 },
+  "Almacén": { baseWood: 480, factorWood: 1.28, baseMarble: 240, factorMarble: 1.28, marbleStartLvl: 1 },
+  "Muralla": { baseWood: 60, factorWood: 1.25, baseMarble: 80, factorMarble: 1.25, marbleStartLvl: 1 },
+  "Museo": { baseWood: 300, factorWood: 1.35, baseMarble: 200, factorMarble: 1.35, marbleStartLvl: 1 }
+};
 
+const TROOP_DEFINITIONS = {
+  units: [
+    { id: "hoplita", name: "Hoplita", icon: "assets/units/hoplita.png", wood: 40, sulfur: 30 },
+    { id: "gigante", name: "Gigante a vapor", icon: "assets/units/gigante.png", wood: 130, sulfur: 180 },
+    { id: "espadachin", name: "Espadachín", icon: "assets/units/espadachin.png", wood: 30, sulfur: 30 },
+    { id: "lancero", name: "Lancero", icon: "assets/units/lancero.png", wood: 30 },
+    { id: "hondero", name: "Hondero", icon: "assets/units/hondero.png", wood: 20 },
+    { id: "arquero", name: "Arquero", icon: "assets/units/arquero.png", wood: 30, sulfur: 25 },
+    { id: "fusilero", name: "Fusilero", icon: "assets/units/fusilero.png", wood: 50, sulfur: 150 },
+    { id: "ariete", name: "Ariete", icon: "assets/units/ariete.png", wood: 220 },
+    { id: "catapulta", name: "Catapulta", icon: "assets/units/catapulta.png", wood: 260, sulfur: 300 },
+    { id: "mortero", name: "Mortero", icon: "assets/units/mortero.png", wood: 300, sulfur: 1250 },
+    { id: "girocoptero", name: "Girocóptero", icon: "assets/units/girocoptero.png", wood: 25, sulfur: 100 },
+    { id: "globo", name: "Globo bombardero", icon: "assets/units/globo.png", wood: 40, sulfur: 250 },
+    { id: "cocinero", name: "Cocinero", icon: "assets/units/cocinero.png", wood: 50, wine: 150 },
+    { id: "medico", name: "Médico", icon: "assets/units/medico.png", wood: 50, crystal: 450 },
+    { id: "espartano", name: "Espartano", icon: "assets/units/espartano.png", wood: 0 }
+  ],
+  ships: [
+    { id: "espolon", name: "Barco espolón", icon: "assets/ships/espolon.png", wood: 250 },
+    { id: "lanzallamas", name: "Barco lanzallamas", icon: "assets/ships/lanzallamas.png", wood: 80, sulfur: 210 },
+    { id: "espolon_vapor", name: "Barco espolón a vapor", icon: "assets/ships/espolon_vapor.png", wood: 700, sulfur: 800 },
+    { id: "ballesta", name: "Barco ballesta", icon: "assets/ships/ballesta.png", wood: 180, sulfur: 160 },
+    { id: "catapulta", name: "Barco catapulta", icon: "assets/ships/catapulta.png", wood: 180, sulfur: 140 },
+    { id: "mortero", name: "Barco mortero", icon: "assets/ships/mortero.png", wood: 220, sulfur: 900 },
+    { id: "submarino", name: "Submarino", icon: "assets/ships/submarino.png", wood: 160, crystal: 750, sulfur: 100 },
+    { id: "lancha", name: "Lancha de palas", icon: "assets/ships/lancha.png", wood: 40, sulfur: 280 },
+    { id: "misiles", name: "Barco lanzamisiles", icon: "assets/ships/misiles.png", wood: 200, sulfur: 1200 },
+    { id: "portaglobos", name: "Portaglobos", icon: "assets/ships/portaglobos.png", wood: 700, sulfur: 700 },
+    { id: "auxiliar", name: "Barco auxiliar", icon: "assets/ships/auxiliar.png", wood: 1200, wine: 800 }
+  ]
+};
+
+let buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
 let appData = {};
 let cityLabels = {};
 let activeCityCount = 13;
 let currentBuilding = null;
 let isEditing = false;
+let currentView = "construction"; // "construction" | "troops"
+
+// Datos de tropas
+let troopsData = {
+  selectedCities: [],
+  activeTroopCity: null,
+  activeTroopType: "units", // "units" | "ships"
+  cities: {}
+};
+
+function formatResNum(num) {
+  if (!num || num <= 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return num.toLocaleString();
+}
+
+function getBuildingUpgradeCost(buildingName, curLvl, city) {
+  const cfg = BUILDING_COSTS[buildingName];
+  if (!cfg) return null;
+  const targetLvl = curLvl + 1;
+  const rawWood = Math.floor(cfg.baseWood * Math.pow(cfg.factorWood, targetLvl - 1));
+  let rawMarble = 0;
+  if (targetLvl >= (cfg.marbleStartLvl || 1)) {
+    const marbleExp = targetLvl - (cfg.marbleStartLvl || 1);
+    rawMarble = Math.floor(cfg.baseMarble * Math.pow(cfg.factorMarble, marbleExp));
+  }
+  
+  // Niveles de edificios ahorradores en esa ciudad
+  const carpLevel = Math.min(50, appData[city]?.["Carpintería"] || 0);
+  const archLevel = Math.min(50, appData[city]?.["Oficina del Arquitecto"] || 0);
+  
+  const finalWood = Math.round(rawWood * (1 - carpLevel / 100));
+  const finalMarble = Math.round(rawMarble * (1 - archLevel / 100));
+  
+  return {
+    wood: finalWood,
+    marble: finalMarble,
+    woodDiscount: carpLevel,
+    marbleDiscount: archLevel
+  };
+}
+
+function getUnitCostInCity(unit, city) {
+  const carp = Math.min(50, appData[city]?.["Carpintería"] || 0);
+  const winePress = Math.min(50, appData[city]?.["Prensa de Vino"] || 0);
+  const pyrotech = Math.min(50, appData[city]?.["Materia Especial"] || 0);
+  
+  return {
+    wood: unit.wood ? Math.round(unit.wood * (1 - carp / 100)) : 0,
+    sulfur: unit.sulfur ? Math.round(unit.sulfur * (1 - pyrotech / 100)) : 0,
+    wine: unit.wine ? Math.round(unit.wine * (1 - winePress / 100)) : 0,
+    crystal: unit.crystal || 0
+  };
+}
 
 // Iniciar con la estructura por defecto si no hay datos guardados
 function getInitialData() {
@@ -38,14 +136,14 @@ function getInitialData() {
   cities.forEach(city => {
     data[city] = {};
     buildingsConfig.forEach(b => {
-      data[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+      data[city][b.name] = 0;
     });
   });
   return data;
 }
 
 function loadData(callback) {
-  chrome.storage.local.get(['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCityCount'], (result) => {
+  chrome.storage.local.get(['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCityCount', 'ikariamTroops'], (result) => {
     let updated = false;
 
     activeCityCount = (result.ikariamCityCount && result.ikariamCityCount >= 1)
@@ -54,7 +152,6 @@ function loadData(callback) {
 
     if (result.ikariamCityLabels) {
       cityLabels = result.ikariamCityLabels;
-      // Si hay entradas en formato antiguo (string), limpiarlas
       let needsSave = false;
       Object.keys(cityLabels).forEach(city => {
         if (typeof cityLabels[city] === 'string') {
@@ -68,7 +165,6 @@ function loadData(callback) {
     }
 
     if (result.ikariamBuildings) {
-      // Reemplazar la configuración por defecto por la configuración guardada del usuario
       const loadedBuildings = [];
       result.ikariamBuildings.forEach(b => {
         if (b.name) {
@@ -77,15 +173,10 @@ function loadData(callback) {
         loadedBuildings.push(b);
       });
 
-      // Sincronizar con DEFAULT_BUILDINGS para asegurar que ningún edificio nuevo falte
       const syncedBuildings = [];
       DEFAULT_BUILDINGS.forEach(defB => {
         const found = loadedBuildings.find(b => b.name === defB.name);
         if (found) {
-          if (defB.isMulti) {
-            found.isMulti = true;
-            found.instances = defB.instances;
-          }
           syncedBuildings.push(found);
         } else {
           syncedBuildings.push({ ...defB });
@@ -93,82 +184,15 @@ function loadData(callback) {
         }
       });
 
-      // Detectar si el orden cambió con respecto a los cargados para forzar el guardado
-      const orderChanged = loadedBuildings.length !== syncedBuildings.length ||
-                           loadedBuildings.some((b, idx) => b.name !== syncedBuildings[idx].name);
-      if (orderChanged) {
-        updated = true;
-      }
-
       buildingsConfig = syncedBuildings;
+    } else {
+      buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
     }
     
-    // Inicializar el edificio activo actual
     currentBuilding = buildingsConfig[0];
     
     if (result.ikariamLevels) {
       appData = result.ikariamLevels;
-      // Normalizar claves de niveles a NFC y migrar "Almacén"/"Depósito" a la ficha unificada "Depósitos"
-      cities.forEach(city => {
-        if (appData[city]) {
-          // Primero normalizar todas las claves existentes a NFC
-          Object.keys(appData[city]).forEach(key => {
-            const normalizedKey = key.normalize('NFC');
-            if (normalizedKey !== key) {
-              appData[city][normalizedKey] = appData[city][key];
-              delete appData[city][key];
-              updated = true;
-            }
-          });
-
-          // Migrar antiguos Deposito 1 y Deposito 2 / Depósito 1 y Depósito 2 a la ficha única "Depósitos"
-          const oldDep1 = appData[city]["Deposito 1"] !== undefined ? appData[city]["Deposito 1"] : appData[city]["Depósito 1"];
-          const oldDep2 = appData[city]["Deposito 2"] !== undefined ? appData[city]["Deposito 2"] : appData[city]["Depósito 2"];
-          
-          if (oldDep1 !== undefined || oldDep2 !== undefined) {
-            const currentDeps = appData[city]["Depósitos"];
-            const isUninitialized = !currentDeps || (Array.isArray(currentDeps) && currentDeps.every(v => v === 0));
-            if (isUninitialized) {
-              appData[city]["Depósitos"] = [
-                typeof oldDep1 === 'number' ? oldDep1 : (Array.isArray(oldDep1) ? (oldDep1[0] || 0) : 0),
-                typeof oldDep2 === 'number' ? oldDep2 : (Array.isArray(oldDep2) ? (oldDep2[0] || 0) : 0)
-              ];
-              updated = true;
-            }
-          }
-
-          // También migrar claves muy viejas como "Almacén", "Depósito", "Deposito"
-          const migrateOldUninstanced = (oldName) => {
-            if (appData[city][oldName] !== undefined) {
-              const val = appData[city][oldName];
-              const levelVal = Array.isArray(val) ? (val[0] || 0) : (typeof val === 'number' ? val : 0);
-              if (levelVal > 0) {
-                if (!appData[city]["Depósitos"]) {
-                  appData[city]["Depósitos"] = [levelVal, 0];
-                  updated = true;
-                } else if (Array.isArray(appData[city]["Depósitos"]) && appData[city]["Depósitos"][0] === 0) {
-                  appData[city]["Depósitos"][0] = levelVal;
-                  updated = true;
-                }
-              }
-            }
-          };
-          migrateOldUninstanced("Almacén");
-          migrateOldUninstanced("Depósito");
-          migrateOldUninstanced("Deposito");
-
-          // Eliminar claves viejas que ya no estén en la configuración
-          const obsoleteKeys = ["Deposito 1", "Deposito 2", "Depósito 1", "Depósito 2", "Almacén", "Depósito", "Deposito"];
-          obsoleteKeys.forEach(oldName => {
-            if (appData[city][oldName] !== undefined && !buildingsConfig.some(b => b.name === oldName)) {
-              delete appData[city][oldName];
-              updated = true;
-            }
-          });
-        }
-      });
-
-      // Asegurarse de que cualquier ciudad/edificio faltante se corrija
       cities.forEach(city => {
         if (!appData[city]) {
           appData[city] = {};
@@ -176,13 +200,9 @@ function loadData(callback) {
         }
         buildingsConfig.forEach(b => {
           if (appData[city][b.name] === undefined) {
-            appData[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+            appData[city][b.name] = 0;
             updated = true;
-          } else if (b.isMulti && !Array.isArray(appData[city][b.name])) {
-            const val = appData[city][b.name];
-            appData[city][b.name] = b.instances.map((_, idx) => (idx === 0 ? val : 0));
-            updated = true;
-          } else if (!b.isMulti && Array.isArray(appData[city][b.name])) {
+          } else if (Array.isArray(appData[city][b.name])) {
             appData[city][b.name] = appData[city][b.name][0] || 0;
             updated = true;
           }
@@ -193,6 +213,27 @@ function loadData(callback) {
       appData = getInitialData();
       saveData();
     }
+
+    // Cargar tropas
+    if (result.ikariamTroops) {
+      troopsData = result.ikariamTroops;
+      if (!troopsData.selectedCities) troopsData.selectedCities = [];
+      if (!troopsData.cities) troopsData.cities = {};
+      if (!troopsData.activeTroopType) troopsData.activeTroopType = "units";
+      if (!troopsData.activeTroopCity && troopsData.selectedCities.length > 0) {
+        troopsData.activeTroopCity = troopsData.selectedCities[0];
+      }
+    } else {
+      // Inicializar con la primera ciudad activa
+      troopsData = {
+        selectedCities: [cities[0]],
+        activeTroopCity: cities[0],
+        activeTroopType: "units",
+        cities: {}
+      };
+      saveTroopsData();
+    }
+
     callback();
   });
 }
@@ -202,6 +243,14 @@ function saveData() {
     ikariamLevels: appData,
     ikariamBuildings: buildingsConfig
   });
+}
+
+function saveTroopsData() {
+  chrome.storage.local.set({ ikariamTroops: troopsData });
+}
+
+function saveCityLabels() {
+  chrome.storage.local.set({ ikariamCityLabels: cityLabels });
 }
 
 function getLevelClass(level, config) {
@@ -226,9 +275,7 @@ function renderTabs() {
     tab.title = b.name;
     
     tab.onclick = () => {
-      // Bloquear cambio de pestaña durante la edición para evitar pérdida de datos contextuales
       if (isEditing) return;
-      
       if (currentBuilding.name !== b.name) {
         currentBuilding = b;
         renderTabs();
@@ -239,8 +286,6 @@ function renderTabs() {
     
     tabsContainer.appendChild(tab);
     
-    // Evitar scrollIntoView en los primeros elementos (índices 0 y 1) para evitar que comience desplazado,
-    // y en los últimos ("Muralla" y "Museo") para evitar rebotes molestos
     const tabIndex = buildingsConfig.findIndex(x => x.name === b.name);
     if (isActive && tabIndex > 1 && b.name !== "Muralla" && b.name !== "Museo") {
       setTimeout(() => {
@@ -255,18 +300,14 @@ function getActiveTargetIndex() {
   for (let i = 0; i < metaKeys.length; i++) {
     const targetValue = currentBuilding[metaKeys[i]];
     const allMeetTarget = cities.slice(0, activeCityCount).every(city => {
-      const val = appData[city][currentBuilding.name];
-      if (Array.isArray(val)) {
-        return val.every(level => level >= targetValue);
-      }
-      const level = val || 0;
+      const level = appData[city]?.[currentBuilding.name] || 0;
       return level >= targetValue;
     });
     if (!allMeetTarget) {
       return i;
     }
   }
-  return metaKeys.length - 1; // Destaque de la última meta si todo se cumplió
+  return metaKeys.length - 1;
 }
 
 function renderMetaSummary() {
@@ -297,7 +338,6 @@ function renderMetaSummary() {
     item.appendChild(dot);
     
     if (isEditing) {
-      // Renderizar input de checkpoint en modo de edición
       const input = document.createElement('input');
       input.type = 'number';
       input.className = 'meta-input';
@@ -306,7 +346,6 @@ function renderMetaSummary() {
       input.setAttribute('data-meta-key', meta.key);
       item.appendChild(input);
     } else {
-      // Renderizar texto estático en modo de visualización
       const text = document.createTextNode(` ${meta.value}`);
       item.appendChild(text);
     }
@@ -319,203 +358,143 @@ function renderContent() {
   const content = document.getElementById('content');
   content.innerHTML = '';
   
-  // Clonar para forzar reiniciar la animación de "slide por la derecha"
   const newContent = content.cloneNode(false);
-  
   const maxGoal = currentBuilding.meta6 || 1;
   
-  cities.slice(0, activeCityCount).forEach((city, cityIdx) => {
+  cities.slice(0, activeCityCount).forEach((city) => {
     const row = document.createElement('div');
     const label = cityLabels[city];
     const shortCode = (label && label.abbr) ? label.abbr : '';
+    const fullName = (label && label.name) ? label.name : city;
     
-    if (currentBuilding.isMulti) {
-      row.className = 'city-row multi-instance';
+    row.className = 'city-row';
+    
+    const cityInfo = document.createElement('div');
+    cityInfo.className = 'city-info';
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'city-name';
+    nameSpan.textContent = shortCode;
+    nameSpan.title = fullName;
+    
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+    
+    const progressFill = document.createElement('div');
+    const level = appData[city]?.[currentBuilding.name] || 0;
+    const lvlClass = getLevelClass(level, currentBuilding);
+    progressFill.className = `progress-fill ${lvlClass}`;
+    
+    const percentage = Math.min(100, (level / maxGoal) * 100);
+    progressFill.style.width = `${percentage}%`;
+    progressContainer.appendChild(progressFill);
+    
+    // Costes para el siguiente nivel con ahorradores
+    const cost = getBuildingUpgradeCost(currentBuilding.name, level, city);
+    let costEl = null;
+    if (cost) {
+      costEl = document.createElement('div');
+      costEl.className = 'building-cost-tag';
       
-      const nameContainer = document.createElement('div');
-      nameContainer.className = 'city-name-container';
+      const woodTitle = `Madera: ${cost.wood.toLocaleString()}${cost.woodDiscount > 0 ? ` (-${cost.woodDiscount}% Carpintería)` : ''}`;
+      costEl.innerHTML = `
+        <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="${woodTitle}">
+          <img src="assets/resources/wood.png" alt="Madera">
+          <span>${formatResNum(cost.wood)}</span>
+        </span>
+      `;
       
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'city-name';
-      nameSpan.textContent = shortCode;
-      nameSpan.title = (label && label.name) ? label.name : city;
-      nameContainer.appendChild(nameSpan);
-      row.appendChild(nameContainer);
-      
-      const instancesList = document.createElement('div');
-      instancesList.className = 'city-instances-list';
-      
-      currentBuilding.instances.forEach((instName, instIdx) => {
-        const instRow = document.createElement('div');
-        instRow.className = 'city-instance-row';
-        
-        const instLabel = document.createElement('span');
-        instLabel.className = 'instance-label';
-        instLabel.textContent = instName.includes('1') ? 'D1' : instName.includes('2') ? 'D2' : instName;
-        instRow.appendChild(instLabel);
-        
-        const progressContainer = document.createElement('div');
-        progressContainer.className = 'progress-container';
-        
-        const progressFill = document.createElement('div');
-        const levels = appData[city][currentBuilding.name] || [];
-        const level = levels[instIdx] || 0;
-        const lvlClass = getLevelClass(level, currentBuilding);
-        progressFill.className = `progress-fill ${lvlClass}`;
-        
-        const percentage = Math.min(100, (level / maxGoal) * 100);
-        progressFill.style.width = `${percentage}%`;
-        progressContainer.appendChild(progressFill);
-        instRow.appendChild(progressContainer);
-        
-        const controls = document.createElement('div');
-        controls.className = 'controls';
-        
-        if (isEditing) {
-          const input = document.createElement('input');
-          input.type = 'number';
-          input.className = 'level-input';
-          input.min = '0';
-          input.value = level;
-          input.setAttribute('data-city', city);
-          input.setAttribute('data-inst-idx', instIdx);
-          controls.appendChild(input);
-        } else {
-          const minusBtn = document.createElement('button');
-          minusBtn.className = 'btn';
-          minusBtn.textContent = '-';
-          
-          const badge = document.createElement('div');
-          badge.className = `level-badge ${lvlClass}`;
-          badge.textContent = level;
-          
-          const plusBtn = document.createElement('button');
-          plusBtn.className = 'btn';
-          plusBtn.textContent = '+';
-          
-          const updateUI = (newLevel) => {
-            const currentLevels = appData[city][currentBuilding.name] || [];
-            currentLevels[instIdx] = newLevel;
-            appData[city][currentBuilding.name] = currentLevels;
-            badge.textContent = newLevel;
-            
-            const newLvlClass = getLevelClass(newLevel, currentBuilding);
-            badge.className = `level-badge ${newLvlClass}`;
-            
-            progressFill.className = `progress-fill ${newLvlClass}`;
-            const pct = Math.min(100, (newLevel / maxGoal) * 100);
-            progressFill.style.width = `${pct}%`;
-            
-            saveData();
-            renderMetaSummary();
-          };
-          
-          minusBtn.onclick = () => {
-            const currentLevels = appData[city][currentBuilding.name] || [];
-            let currentLvl = currentLevels[instIdx] || 0;
-            if (currentLvl > 0) updateUI(currentLvl - 1);
-          };
-          
-          plusBtn.onclick = () => {
-            const currentLevels = appData[city][currentBuilding.name] || [];
-            let currentLvl = currentLevels[instIdx] || 0;
-            updateUI(currentLvl + 1);
-          };
-          
-          controls.appendChild(minusBtn);
-          controls.appendChild(badge);
-          controls.appendChild(plusBtn);
-        }
-        
-        instRow.appendChild(controls);
-        instancesList.appendChild(instRow);
-      });
-      
-      row.appendChild(instancesList);
-      
-    } else {
-      row.className = 'city-row';
-      
-      const cityInfo = document.createElement('div');
-      cityInfo.className = 'city-info';
-      
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'city-name';
-      nameSpan.textContent = shortCode;
-      nameSpan.title = (label && label.name) ? label.name : city;
-      
-      const progressContainer = document.createElement('div');
-      progressContainer.className = 'progress-container';
-      
-      const progressFill = document.createElement('div');
-      const level = appData[city][currentBuilding.name] || 0;
-      const lvlClass = getLevelClass(level, currentBuilding);
-      progressFill.className = `progress-fill ${lvlClass}`;
-      
-      const percentage = Math.min(100, (level / maxGoal) * 100);
-      progressFill.style.width = `${percentage}%`;
-      
-      progressContainer.appendChild(progressFill);
-      cityInfo.appendChild(nameSpan);
-      cityInfo.appendChild(progressContainer);
-      
-      const controls = document.createElement('div');
-      controls.className = 'controls';
-      
-      if (isEditing) {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.className = 'level-input';
-        input.min = '0';
-        input.value = level;
-        input.setAttribute('data-city', city);
-        controls.appendChild(input);
-      } else {
-        const minusBtn = document.createElement('button');
-        minusBtn.className = 'btn';
-        minusBtn.textContent = '-';
-        
-        const badge = document.createElement('div');
-        badge.className = `level-badge ${lvlClass}`;
-        badge.textContent = level;
-        
-        const plusBtn = document.createElement('button');
-        plusBtn.className = 'btn';
-        plusBtn.textContent = '+';
-        
-        const updateUI = (newLevel) => {
-          appData[city][currentBuilding.name] = newLevel;
-          badge.textContent = newLevel;
-          
-          const newLvlClass = getLevelClass(newLevel, currentBuilding);
-          badge.className = `level-badge ${newLvlClass}`;
-          
-          progressFill.className = `progress-fill ${newLvlClass}`;
-          const pct = Math.min(100, (newLevel / maxGoal) * 100);
-          progressFill.style.width = `${pct}%`;
-          
-          saveData();
-          renderMetaSummary();
-        };
-        
-        minusBtn.onclick = () => {
-          let currentLvl = appData[city][currentBuilding.name] || 0;
-          if (currentLvl > 0) updateUI(currentLvl - 1);
-        };
-        
-        plusBtn.onclick = () => {
-          let currentLvl = appData[city][currentBuilding.name] || 0;
-          updateUI(currentLvl + 1);
-        };
-        
-        controls.appendChild(minusBtn);
-        controls.appendChild(badge);
-        controls.appendChild(plusBtn);
+      if (cost.marble > 0) {
+        const marbleTitle = `Mármol: ${cost.marble.toLocaleString()}${cost.marbleDiscount > 0 ? ` (-${cost.marbleDiscount}% Arquitecto)` : ''}`;
+        costEl.innerHTML += `
+          <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="${marbleTitle}">
+            <img src="assets/resources/marble.png" alt="Mármol">
+            <span>${formatResNum(cost.marble)}</span>
+          </span>
+        `;
       }
-      
-      row.appendChild(cityInfo);
-      row.appendChild(controls);
     }
+    
+    cityInfo.appendChild(nameSpan);
+    cityInfo.appendChild(progressContainer);
+    if (costEl) cityInfo.appendChild(costEl);
+    
+    const controls = document.createElement('div');
+    controls.className = 'controls';
+    
+    if (isEditing) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'level-input';
+      input.min = '0';
+      input.value = level;
+      input.setAttribute('data-city', city);
+      controls.appendChild(input);
+    } else {
+      const minusBtn = document.createElement('button');
+      minusBtn.className = 'btn';
+      minusBtn.textContent = '-';
+      
+      const badge = document.createElement('div');
+      badge.className = `level-badge ${lvlClass}`;
+      badge.textContent = level;
+      
+      const plusBtn = document.createElement('button');
+      plusBtn.className = 'btn';
+      plusBtn.textContent = '+';
+      
+      const updateUI = (newLevel) => {
+        appData[city][currentBuilding.name] = newLevel;
+        badge.textContent = newLevel;
+        
+        const newLvlClass = getLevelClass(newLevel, currentBuilding);
+        badge.className = `level-badge ${newLvlClass}`;
+        
+        progressFill.className = `progress-fill ${newLvlClass}`;
+        const pct = Math.min(100, (newLevel / maxGoal) * 100);
+        progressFill.style.width = `${pct}%`;
+        
+        saveData();
+        renderMetaSummary();
+        // Actualizar etiqueta de coste
+        if (costEl) {
+          const updatedCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
+          if (updatedCost) {
+            costEl.innerHTML = `
+              <span class="res-chip ${updatedCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${updatedCost.wood.toLocaleString()}">
+                <img src="assets/resources/wood.png" alt="Madera">
+                <span>${formatResNum(updatedCost.wood)}</span>
+              </span>
+            `;
+            if (updatedCost.marble > 0) {
+              costEl.innerHTML += `
+                <span class="res-chip ${updatedCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${updatedCost.marble.toLocaleString()}">
+                  <img src="assets/resources/marble.png" alt="Mármol">
+                  <span>${formatResNum(updatedCost.marble)}</span>
+                </span>
+              `;
+            }
+          }
+        }
+      };
+      
+      minusBtn.onclick = () => {
+        let currentLvl = appData[city][currentBuilding.name] || 0;
+        if (currentLvl > 0) updateUI(currentLvl - 1);
+      };
+      
+      plusBtn.onclick = () => {
+        let currentLvl = appData[city][currentBuilding.name] || 0;
+        updateUI(currentLvl + 1);
+      };
+      
+      controls.appendChild(minusBtn);
+      controls.appendChild(badge);
+      controls.appendChild(plusBtn);
+    }
+    
+    row.appendChild(cityInfo);
+    row.appendChild(controls);
     
     newContent.appendChild(row);
   });
@@ -529,7 +508,6 @@ function setupEditButton() {
   
   btnEdit.onclick = () => {
     if (!isEditing) {
-      // Activar modo edición
       isEditing = true;
       btnEdit.textContent = '✔️';
       btnEdit.className = 'floating-btn edit-mode-on';
@@ -538,9 +516,6 @@ function setupEditButton() {
       renderMetaSummary();
       renderContent();
     } else {
-      // Guardar cambios y desactivar modo edición
-      
-      // 1. Guardar checkpoints del edificio activo
       const metaInputs = document.querySelectorAll('.meta-input');
       metaInputs.forEach(input => {
         const key = input.getAttribute('data-meta-key');
@@ -548,32 +523,19 @@ function setupEditButton() {
         currentBuilding[key] = isNaN(val) ? 0 : Math.max(0, val);
       });
       
-      // 2. Guardar niveles de las ciudades
       const levelInputs = document.querySelectorAll('.level-input');
       levelInputs.forEach(input => {
         const city = input.getAttribute('data-city');
         const val = parseInt(input.value, 10);
         const cleanVal = isNaN(val) ? 0 : Math.max(0, val);
-        
-        const instIdxAttr = input.getAttribute('data-inst-idx');
-        if (instIdxAttr !== null) {
-          const instIdx = parseInt(instIdxAttr, 10);
-          if (!Array.isArray(appData[city][currentBuilding.name])) {
-            appData[city][currentBuilding.name] = [];
-          }
-          appData[city][currentBuilding.name][instIdx] = cleanVal;
-        } else {
-          appData[city][currentBuilding.name] = cleanVal;
-        }
+        appData[city][currentBuilding.name] = cleanVal;
       });
       
-      // Desactivar modo edición
       isEditing = false;
       btnEdit.textContent = '✏️';
       btnEdit.className = 'floating-btn edit-mode-off';
       btnEdit.title = 'Editar niveles y checkpoints';
       
-      // Persistir y renderizar
       saveData();
       renderMetaSummary();
       renderContent();
@@ -581,10 +543,439 @@ function setupEditButton() {
   };
 }
 
-function saveCityLabels() {
-  chrome.storage.local.set({ ikariamCityLabels: cityLabels });
+// ========================================================
+// LÓGICA DE TROPAS
+// ========================================================
+function renderTroopCityTabs() {
+  const container = document.getElementById('troops-city-tabs');
+  container.innerHTML = '';
+
+  if (troopsData.selectedCities.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+
+  troopsData.selectedCities.forEach(city => {
+    const tab = document.createElement('div');
+    const isActive = city === troopsData.activeTroopCity;
+    tab.className = `troop-city-tab ${isActive ? 'active' : ''}`;
+    
+    const label = cityLabels[city];
+    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+    const fullName = (label && label.name) ? label.name : city;
+
+    tab.textContent = shortCode;
+    tab.title = fullName;
+
+    // Botón para desvincular ciudad de vista de tropas
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'troop-city-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Quitar de la vista de tropas';
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      troopsData.selectedCities = troopsData.selectedCities.filter(c => c !== city);
+      if (troopsData.activeTroopCity === city) {
+        troopsData.activeTroopCity = troopsData.selectedCities[0] || null;
+      }
+      saveTroopsData();
+      renderTroopCityTabs();
+      renderTroopsContent();
+    };
+
+    tab.onclick = () => {
+      if (troopsData.activeTroopCity !== city) {
+        troopsData.activeTroopCity = city;
+        renderTroopCityTabs();
+        renderTroopsContent();
+      }
+    };
+
+    tab.appendChild(closeBtn);
+    container.appendChild(tab);
+  });
 }
 
+function renderTroopsContent() {
+  const container = document.getElementById('troops-content');
+  container.innerHTML = '';
+
+  const city = troopsData.activeTroopCity;
+  if (!city || !troopsData.selectedCities.includes(city)) {
+    container.innerHTML = `
+      <div class="no-troops-msg">
+        <p>No hay ninguna ciudad seleccionada en Tropas.</p>
+        <button id="btn-add-first-troop-city" class="btn-action primary" style="max-width:180px;margin:10px auto;">+ Añadir Ciudad</button>
+      </div>
+    `;
+    const btn = document.getElementById('btn-add-first-troop-city');
+    if (btn) btn.onclick = openTroopCityModal;
+    return;
+  }
+
+  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
+  if (!troopsData.cities[city]) {
+    troopsData.cities[city] = { units: {}, ships: {} };
+  }
+  const typeKey = troopsData.activeTroopType;
+  if (!troopsData.cities[city][typeKey]) {
+    troopsData.cities[city][typeKey] = {};
+  }
+  const cityTroops = troopsData.cities[city][typeKey];
+
+  // Cálculo de totales necesarios para la ciudad
+  let totalMissingWood = 0;
+  let totalMissingSulfur = 0;
+  let totalMissingCrystal = 0;
+  let totalMissingWine = 0;
+
+  list.forEach(unit => {
+    const data = cityTroops[unit.id] || { actual: 0, desired: 0 };
+    const missing = Math.max(0, (data.desired || 0) - (data.actual || 0));
+    if (missing > 0) {
+      const cost = getUnitCostInCity(unit, city);
+      totalMissingWood += missing * cost.wood;
+      totalMissingSulfur += missing * cost.sulfur;
+      totalMissingCrystal += missing * cost.crystal;
+      totalMissingWine += missing * cost.wine;
+    }
+  });
+
+  // Tarjeta de resumen de materiales faltantes
+  const summaryCard = document.createElement('div');
+  summaryCard.className = 'troop-summary-card';
+  const label = cityLabels[city];
+  const cityName = (label && label.name) ? label.name : city;
+
+  summaryCard.innerHTML = `
+    <div class="troop-summary-title">
+      <span>Materiales requeridos para objetivo en <strong>${cityName}</strong>:</span>
+    </div>
+    <div class="troop-summary-resources">
+      <span class="res-chip" title="Madera faltante: ${totalMissingWood.toLocaleString()}">
+        <img src="assets/resources/wood.png" alt="Madera">
+        <span>${formatResNum(totalMissingWood)}</span>
+      </span>
+      ${totalMissingSulfur > 0 ? `
+        <span class="res-chip" title="Azufre faltante: ${totalMissingSulfur.toLocaleString()}">
+          <img src="assets/resources/sulfur.png" alt="Azufre">
+          <span>${formatResNum(totalMissingSulfur)}</span>
+        </span>
+      ` : ''}
+      ${totalMissingCrystal > 0 ? `
+        <span class="res-chip" title="Cristal faltante: ${totalMissingCrystal.toLocaleString()}">
+          <img src="assets/resources/glass.png" alt="Cristal">
+          <span>${formatResNum(totalMissingCrystal)}</span>
+        </span>
+      ` : ''}
+      ${totalMissingWine > 0 ? `
+        <span class="res-chip" title="Vino faltante: ${totalMissingWine.toLocaleString()}">
+          <img src="assets/resources/wine.png" alt="Vino">
+          <span>${formatResNum(totalMissingWine)}</span>
+        </span>
+      ` : ''}
+    </div>
+  `;
+  container.appendChild(summaryCard);
+
+  // Lista de Tropas / Barcos
+  const grid = document.createElement('div');
+  grid.className = 'troop-grid';
+
+  list.forEach(unit => {
+    if (!cityTroops[unit.id]) {
+      cityTroops[unit.id] = { actual: 0, desired: 0 };
+    }
+    const unitData = cityTroops[unit.id];
+    const cost = getUnitCostInCity(unit, city);
+    const missing = Math.max(0, (unitData.desired || 0) - (unitData.actual || 0));
+
+    const card = document.createElement('div');
+    card.className = 'troop-card';
+
+    // Icono
+    const iconContainer = document.createElement('div');
+    iconContainer.className = 'troop-icon-container';
+    const img = document.createElement('img');
+    img.src = unit.icon;
+    img.alt = unit.name;
+    iconContainer.appendChild(img);
+
+    // Detalles
+    const details = document.createElement('div');
+    details.className = 'troop-details';
+
+    // Fila superior: Nombre de la tropa
+    const titleRow = document.createElement('div');
+    titleRow.className = 'troop-title-row';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'troop-name';
+    nameEl.textContent = unit.name;
+    titleRow.appendChild(nameEl);
+
+    // Fila de controles: Actual, Cola (+), Deseado
+    const inputsRow = document.createElement('div');
+    inputsRow.className = 'troop-inputs-row';
+
+    // Actual
+    const actualGroup = document.createElement('div');
+    actualGroup.className = 'troop-group';
+    actualGroup.innerHTML = `<span class="troop-group-label">Real:</span>`;
+    
+    const minusBtn = document.createElement('button');
+    minusBtn.className = 'troop-btn-tiny';
+    minusBtn.textContent = '-';
+    
+    const actualInput = document.createElement('input');
+    actualInput.type = 'number';
+    actualInput.className = 'troop-input-num';
+    actualInput.min = '0';
+    actualInput.value = unitData.actual;
+
+    const plusBtn = document.createElement('button');
+    plusBtn.className = 'troop-btn-tiny';
+    plusBtn.textContent = '+';
+
+    const saveAndRefresh = () => {
+      saveTroopsData();
+      renderTroopsContent();
+    };
+
+    minusBtn.onclick = () => {
+      if (unitData.actual > 0) {
+        unitData.actual--;
+        saveAndRefresh();
+      }
+    };
+    plusBtn.onclick = () => {
+      unitData.actual++;
+      saveAndRefresh();
+    };
+    actualInput.onchange = () => {
+      const val = parseInt(actualInput.value, 10);
+      unitData.actual = isNaN(val) ? 0 : Math.max(0, val);
+      saveAndRefresh();
+    };
+
+    actualGroup.appendChild(minusBtn);
+    actualGroup.appendChild(actualInput);
+    actualGroup.appendChild(plusBtn);
+
+    // Botón Agregar cola (+ entrenar)
+    const queueBox = document.createElement('div');
+    queueBox.className = 'troop-queue-box';
+    queueBox.title = 'Agregar tropas que están entrenando en cuartel/astillero';
+    
+    const queueInput = document.createElement('input');
+    queueInput.type = 'number';
+    queueInput.className = 'troop-queue-input';
+    queueInput.placeholder = '+cola';
+    queueInput.min = '1';
+
+    const queueAddBtn = document.createElement('button');
+    queueAddBtn.className = 'troop-btn-tiny';
+    queueAddBtn.textContent = '+';
+    queueAddBtn.title = 'Sumar a las reales';
+
+    const applyQueue = () => {
+      const addVal = parseInt(queueInput.value, 10);
+      if (!isNaN(addVal) && addVal > 0) {
+        unitData.actual += addVal;
+        queueInput.value = '';
+        saveAndRefresh();
+      }
+    };
+
+    queueAddBtn.onclick = applyQueue;
+    queueInput.onkeydown = (e) => {
+      if (e.key === 'Enter') applyQueue();
+    };
+
+    queueBox.appendChild(queueInput);
+    queueBox.appendChild(queueAddBtn);
+
+    // Deseado
+    const desiredGroup = document.createElement('div');
+    desiredGroup.className = 'troop-group';
+    desiredGroup.innerHTML = `<span class="troop-group-label">Meta:</span>`;
+
+    const desiredInput = document.createElement('input');
+    desiredInput.type = 'number';
+    desiredInput.className = 'troop-input-num';
+    desiredInput.min = '0';
+    desiredInput.value = unitData.desired;
+    desiredInput.onchange = () => {
+      const val = parseInt(desiredInput.value, 10);
+      unitData.desired = isNaN(val) ? 0 : Math.max(0, val);
+      saveAndRefresh();
+    };
+
+    desiredGroup.appendChild(desiredInput);
+
+    inputsRow.appendChild(actualGroup);
+    inputsRow.appendChild(queueBox);
+    inputsRow.appendChild(desiredGroup);
+
+    // Fila de recursos faltantes para esta unidad
+    const neededResRow = document.createElement('div');
+    neededResRow.className = 'troop-needed-res';
+
+    if (missing > 0) {
+      const mWood = missing * cost.wood;
+      const mSulfur = missing * cost.sulfur;
+      const mCrystal = missing * cost.crystal;
+      const mWine = missing * cost.wine;
+
+      neededResRow.innerHTML = `
+        <span class="res-chip" title="Falta ${mWood.toLocaleString()} madera">
+          <img src="assets/resources/wood.png" alt="Madera">
+          <span>${formatResNum(mWood)}</span>
+        </span>
+      `;
+      if (mSulfur > 0) {
+        neededResRow.innerHTML += `
+          <span class="res-chip" title="Falta ${mSulfur.toLocaleString()} azufre">
+            <img src="assets/resources/sulfur.png" alt="Azufre">
+            <span>${formatResNum(mSulfur)}</span>
+          </span>
+        `;
+      }
+      if (mCrystal > 0) {
+        neededResRow.innerHTML += `
+          <span class="res-chip" title="Falta ${mCrystal.toLocaleString()} cristal">
+            <img src="assets/resources/glass.png" alt="Cristal">
+            <span>${formatResNum(mCrystal)}</span>
+          </span>
+        `;
+      }
+      if (mWine > 0) {
+        neededResRow.innerHTML += `
+          <span class="res-chip" title="Falta ${mWine.toLocaleString()} vino">
+            <img src="assets/resources/wine.png" alt="Vino">
+            <span>${formatResNum(mWine)}</span>
+          </span>
+        `;
+      }
+    } else {
+      neededResRow.innerHTML = `<span style="color:#2e7d32;font-size:10px;font-weight:bold;">✔️ Objetivo completado</span>`;
+    }
+
+    details.appendChild(titleRow);
+    details.appendChild(inputsRow);
+    details.appendChild(neededResRow);
+
+    card.appendChild(iconContainer);
+    card.appendChild(details);
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+}
+
+function openTroopCityModal() {
+  const modal = document.getElementById('troop-city-modal');
+  const listContainer = document.getElementById('available-troop-cities-list');
+  listContainer.innerHTML = '';
+
+  const activeCitiesList = cities.slice(0, activeCityCount);
+  activeCitiesList.forEach((city, idx) => {
+    const item = document.createElement('div');
+    item.className = 'city-rename-item';
+    item.style.cursor = 'pointer';
+
+    const label = cityLabels[city];
+    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+    const fullName = (label && label.name) ? label.name : city;
+    const isAlreadyAdded = troopsData.selectedCities.includes(city);
+
+    item.innerHTML = `
+      <span class="city-rename-index">${idx + 1}</span>
+      <span style="flex-grow:1;font-weight:bold;font-size:11px;">${shortCode} - ${fullName}</span>
+      <span style="font-size:11px;font-weight:bold;color:${isAlreadyAdded ? '#2e7d32' : '#b14329'};">
+        ${isAlreadyAdded ? 'Añadida ✔️' : '+ Añadir'}
+      </span>
+    `;
+
+    item.onclick = () => {
+      if (!isAlreadyAdded) {
+        troopsData.selectedCities.push(city);
+        troopsData.activeTroopCity = city;
+        saveTroopsData();
+        renderTroopCityTabs();
+        renderTroopsContent();
+        modal.classList.add('hidden');
+      } else {
+        troopsData.activeTroopCity = city;
+        saveTroopsData();
+        renderTroopCityTabs();
+        renderTroopsContent();
+        modal.classList.add('hidden');
+      }
+    };
+
+    listContainer.appendChild(item);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function setupTroopsNavigation() {
+  // Pestañas principales (Construcción / Tropas)
+  const navConstruction = document.getElementById('nav-btn-construction');
+  const navTroops = document.getElementById('nav-btn-troops');
+  const viewConstruction = document.getElementById('view-construction');
+  const viewTroops = document.getElementById('view-troops');
+  const btnEdit = document.getElementById('btn-edit');
+
+  navConstruction.onclick = () => {
+    currentView = "construction";
+    navConstruction.classList.add('active');
+    navTroops.classList.remove('active');
+    viewConstruction.classList.remove('hidden');
+    viewTroops.classList.add('hidden');
+    btnEdit.style.display = 'flex';
+  };
+
+  navTroops.onclick = () => {
+    currentView = "troops";
+    navTroops.classList.add('active');
+    navConstruction.classList.remove('active');
+    viewTroops.classList.remove('hidden');
+    viewConstruction.classList.add('hidden');
+    btnEdit.style.display = 'none'; // El lápiz es para niveles de edificios
+    renderTroopCityTabs();
+    renderTroopsContent();
+  };
+
+  // Subpestañas Tropas (Unidades / Barcos)
+  const subtabUnits = document.getElementById('troops-subtab-units');
+  const subtabShips = document.getElementById('troops-subtab-ships');
+
+  subtabUnits.onclick = () => {
+    troopsData.activeTroopType = "units";
+    subtabUnits.classList.add('active');
+    subtabShips.classList.remove('active');
+    saveTroopsData();
+    renderTroopsContent();
+  };
+
+  subtabShips.onclick = () => {
+    troopsData.activeTroopType = "ships";
+    subtabShips.classList.add('active');
+    subtabUnits.classList.remove('active');
+    saveTroopsData();
+    renderTroopsContent();
+  };
+
+  // Botón + Ciudad modal
+  document.getElementById('btn-add-troop-city').onclick = openTroopCityModal;
+  document.getElementById('btn-close-troop-city-modal').onclick = () => {
+    document.getElementById('troop-city-modal').classList.add('hidden');
+  };
+}
+
+// Configuración general
 function populateCityRenameList() {
   const container = document.getElementById('city-rename-list');
   container.innerHTML = '';
@@ -593,13 +984,11 @@ function populateCityRenameList() {
     const item = document.createElement('div');
     item.className = 'city-rename-item';
     
-    // Número de ciudad
     const indexSpan = document.createElement('span');
     indexSpan.className = 'city-rename-index';
     indexSpan.textContent = idx + 1;
     indexSpan.title = city;
     
-    // Campo: Nombre completo
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.className = 'city-rename-input name-input';
@@ -608,7 +997,6 @@ function populateCityRenameList() {
     const existingLabel = cityLabels[city];
     nameInput.value = (existingLabel && existingLabel.name) ? existingLabel.name : '';
     
-    // Campo: Abreviatura
     const abbrInput = document.createElement('input');
     abbrInput.type = 'text';
     abbrInput.className = 'city-rename-input abbr-input';
@@ -620,14 +1008,10 @@ function populateCityRenameList() {
       const nameVal = nameInput.value.trim();
       const abbrVal = abbrInput.value.trim();
       if (nameVal || abbrVal) {
-        cityLabels[city] = {
-          name: nameVal,
-          abbr: abbrVal
-        };
+        cityLabels[city] = { name: nameVal, abbr: abbrVal };
       } else {
         delete cityLabels[city];
       }
-      // Solo actualiza memoria, no guarda ni re-renderiza hasta presionar Guardar
     };
     
     nameInput.addEventListener('input', saveLabel);
@@ -651,7 +1035,6 @@ function setupSettingsButton() {
   
   btnSettings.onclick = () => {
     overlay.classList.remove('hidden');
-    // Cargar valor actual en el input
     document.getElementById('input-city-count').value = activeCityCount;
     populateCityRenameList();
     txtBackup.classList.add('hidden');
@@ -666,29 +1049,31 @@ function setupSettingsButton() {
     if (!isNaN(val) && val >= 1 && val <= cities.length) {
       activeCityCount = val;
       chrome.storage.local.set({ ikariamCityCount: val });
-      // Refrescar la lista de nombres para mostrar solo las activas
       populateCityRenameList();
       renderTabs();
       renderMetaSummary();
       renderContent();
+      renderTroopCityTabs();
     }
   };
 
   const applyAndClose = () => {
     saveCityLabels();
     renderContent();
+    renderTroopCityTabs();
+    renderTroopsContent();
     overlay.classList.add('hidden');
   };
 
   btnClose.onclick = applyAndClose;
-
   document.getElementById('btn-save-cities').onclick = applyAndClose;
   
   btnExport.onclick = () => {
     const dataToExport = {
       ikariamLevels: appData,
       ikariamBuildings: buildingsConfig,
-      ikariamCityLabels: cityLabels
+      ikariamCityLabels: cityLabels,
+      ikariamTroops: troopsData
     };
     const jsonStr = JSON.stringify(dataToExport, null, 2);
     txtBackup.value = jsonStr;
@@ -729,14 +1114,20 @@ function setupSettingsButton() {
         buildingsConfig = parsed.ikariamBuildings;
       }
       cityLabels = parsed.ikariamCityLabels || {};
+      if (parsed.ikariamTroops) {
+        troopsData = parsed.ikariamTroops;
+      }
       
       saveData();
       saveCityLabels();
+      saveTroopsData();
       
       loadData(() => {
         renderTabs();
         renderMetaSummary();
         renderContent();
+        renderTroopCityTabs();
+        renderTroopsContent();
         showBackupStatus("¡Datos importados con éxito!", true);
         setTimeout(() => {
           overlay.classList.add('hidden');
@@ -769,5 +1160,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderContent();
     setupEditButton();
     setupSettingsButton();
+    setupTroopsNavigation();
   });
 });

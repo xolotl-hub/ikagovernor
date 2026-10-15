@@ -6,9 +6,49 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="tabs-container" id="tabs"></div>
-  <div class="building-meta-summary" id="meta-summary"></div>
-  <div class="content" id="content"></div>
+  <!-- Navegación Principal Global -->
+  <div class="main-nav">
+    <button id="nav-btn-construction" class="nav-btn active">🏛️ Construcción</button>
+    <button id="nav-btn-troops" class="nav-btn">⚔️ Tropas</button>
+  </div>
+
+  <!-- Vista: Construcción -->
+  <div id="view-construction" class="view-panel active">
+    <div class="tabs-container" id="tabs"></div>
+    <div class="building-meta-summary" id="meta-summary"></div>
+    <div class="content" id="content"></div>
+  </div>
+
+  <!-- Vista: Tropas -->
+  <div id="view-troops" class="view-panel hidden">
+    <div class="troops-top-bar">
+      <div class="troops-type-selector">
+        <button id="troops-subtab-units" class="troops-subtab active">Unidades</button>
+        <button id="troops-subtab-ships" class="troops-subtab">Barcos</button>
+      </div>
+      <button id="btn-add-troop-city" class="btn-action primary" title="Añadir ciudad a la vista de tropas">+ Ciudad</button>
+    </div>
+    
+    <!-- Pestañas horizontales de ciudades en tropas -->
+    <div class="troops-city-tabs" id="troops-city-tabs"></div>
+
+    <!-- Contenedor del contenido militar de la ciudad seleccionada -->
+    <div class="troops-content" id="troops-content"></div>
+  </div>
+
+  <!-- Modal para seleccionar y añadir ciudad a tropas -->
+  <div id="troop-city-modal" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 50%;">
+      <div class="overlay-header">
+        <h2>Añadir Ciudad a Tropas</h2>
+        <button id="btn-close-troop-city-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <p class="section-desc">Selecciona una ciudad para seguir sus tropas:</p>
+        <div id="available-troop-cities-list" class="city-rename-list"></div>
+      </div>
+    </div>
+  </div>
   
   <!-- Botón flotante de edición y configuración -->
   <button id="btn-settings" class="floating-btn settings-btn" title="Configuración">⚙️</button>

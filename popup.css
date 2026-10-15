@@ -535,3 +535,319 @@ body {
   text-align: center;
   flex-shrink: 0;
 }
+
+/* ========================================================
+   NAVEGACIÓN PRINCIPAL GLOBAL (CONSTRUCCIÓN / TROPAS)
+   ======================================================== */
+.main-nav {
+  display: flex;
+  background-color: #5d4037;
+  border-bottom: 2px solid #8d6e63;
+  position: sticky;
+  top: 0;
+  z-index: 500;
+}
+.nav-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background-color: transparent;
+  color: #d7ccc8;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+.nav-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.nav-btn.active {
+  background-color: #d8ceb0;
+  color: #b14329;
+  border-bottom: 3px solid #b14329;
+}
+.view-panel {
+  display: block;
+}
+.view-panel.hidden {
+  display: none !important;
+}
+
+/* ========================================================
+   COSTES DE MATERIALES EN LISTA DE EDIFICIOS (CON AHORRADORES)
+   ======================================================== */
+.building-cost-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: #555;
+}
+.res-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.res-chip img {
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+}
+.res-chip.discounted {
+  border-color: #2e7d32;
+  color: #1b5e20;
+}
+
+/* ========================================================
+   VISTA DE TROPAS
+   ======================================================== */
+.troops-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #e5dcb7;
+  padding: 6px 10px;
+  border-bottom: 1px solid #c2b58b;
+  gap: 8px;
+}
+.troops-type-selector {
+  display: flex;
+  gap: 4px;
+}
+.troops-subtab {
+  padding: 5px 12px;
+  border: 1px solid #c2b58b;
+  background-color: #f4eccd;
+  color: #555;
+  font-weight: bold;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.troops-subtab:hover {
+  background-color: #ebdcb5;
+}
+.troops-subtab.active {
+  background-color: #b14329;
+  color: white;
+  border-color: #933620;
+}
+.troops-city-tabs {
+  display: flex;
+  overflow-x: auto;
+  background-color: #d8ceb0;
+  padding: 4px 6px 0 6px;
+  gap: 4px;
+  border-bottom: 2px solid #b14329;
+}
+.troop-city-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background-color: #e5dcb7;
+  border: 1px solid #c2b58b;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  font-size: 11px;
+  font-weight: bold;
+  color: #555;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.troop-city-tab:hover {
+  background-color: #d1c59c;
+}
+.troop-city-tab.active {
+  background-color: #f4eccd;
+  color: #b14329;
+  border-top: 2px solid #b14329;
+}
+.troop-city-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 10px;
+  color: #888;
+  cursor: pointer;
+  margin-left: 2px;
+}
+.troop-city-close:hover {
+  background-color: #c62828;
+  color: white;
+}
+
+.troops-content {
+  padding: 8px 10px;
+}
+.troop-summary-card {
+  background: #ebdcb5;
+  border: 1px solid #c2b58b;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.troop-summary-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+}
+.troop-summary-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.troop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.troop-card {
+  display: flex;
+  align-items: center;
+  background: #faf4e1;
+  border: 1px solid #d8ceb0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.troop-icon-container {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #fdfaf2;
+  border: 1px solid #c2b58b;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.08);
+}
+.troop-icon-container img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.troop-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-grow: 1;
+  min-width: 0;
+}
+.troop-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.troop-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #4a3b2c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.troop-inputs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.troop-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+.troop-group-label {
+  font-size: 10px;
+  color: #777;
+  font-weight: bold;
+}
+.troop-input-num {
+  width: 44px;
+  height: 22px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 11px;
+  border: 1px solid #c2b58b;
+  border-radius: 3px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.troop-input-num:focus {
+  outline: none;
+  border-color: #b14329;
+}
+.troop-btn-tiny {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #c2b58b;
+  background: #e5dcb7;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  color: #555;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.troop-btn-tiny:hover {
+  background: #b14329;
+  color: white;
+  border-color: #933620;
+}
+.troop-queue-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(177, 67, 41, 0.08);
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px dashed rgba(177, 67, 41, 0.3);
+}
+.troop-queue-input {
+  width: 36px;
+  height: 20px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  border: 1px solid #c2b58b;
+  border-radius: 2px;
+}
+.troop-needed-res {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.no-troops-msg {
+  text-align: center;
+  padding: 25px 15px;
+  color: #7b7050;
+  font-size: 12px;
+}
