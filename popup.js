@@ -978,24 +978,24 @@ function renderTroopsContent() {
     const card = document.createElement('div');
     card.className = 'troop-card';
 
-    // Cabecera compacta: Icono + Nombre
-    const header = document.createElement('div');
-    header.className = 'troop-card-header';
-    header.innerHTML = `
+    // Columna 1: Imagen más grande + Nombre
+    const colIdentity = document.createElement('div');
+    colIdentity.className = 'troop-col-identity';
+    colIdentity.innerHTML = `
       <div class="troop-icon-container">
         <img src="${unit.icon}" alt="${unit.name}">
       </div>
       <span class="troop-name" title="${unit.name}">${unit.name}</span>
     `;
 
-    // Controles: Real y Meta
-    const controls = document.createElement('div');
-    controls.className = 'troop-controls-compact';
+    // Columna 2: Inputs Real y Meta
+    const colInputs = document.createElement('div');
+    colInputs.className = 'troop-col-inputs';
 
     // Fila Real
     const rowReal = document.createElement('div');
     rowReal.className = 'troop-field-row';
-    rowReal.innerHTML = `<label>Real:</label>`;
+    rowReal.innerHTML = `<label title="Cantidad real">R:</label>`;
     const inputReal = document.createElement('input');
     inputReal.type = 'number';
     inputReal.className = 'troop-input-num';
@@ -1012,7 +1012,7 @@ function renderTroopsContent() {
     // Fila Meta
     const rowMeta = document.createElement('div');
     rowMeta.className = 'troop-field-row';
-    rowMeta.innerHTML = `<label>Meta:</label>`;
+    rowMeta.innerHTML = `<label title="Cantidad deseada">M:</label>`;
     const inputMeta = document.createElement('input');
     inputMeta.type = 'number';
     inputMeta.className = 'troop-input-num';
@@ -1026,12 +1026,12 @@ function renderTroopsContent() {
     };
     rowMeta.appendChild(inputMeta);
 
-    controls.appendChild(rowReal);
-    controls.appendChild(rowMeta);
+    colInputs.appendChild(rowReal);
+    colInputs.appendChild(rowMeta);
 
-    // Recursos faltantes
-    const neededResRow = document.createElement('div');
-    neededResRow.className = 'troop-needed-res';
+    // Columna 3: Materiales en pila vertical
+    const colMats = document.createElement('div');
+    colMats.className = 'troop-col-mats';
 
     if (missing > 0) {
       const mWood = missing * cost.wood;
@@ -1039,43 +1039,43 @@ function renderTroopsContent() {
       const mCrystal = missing * cost.crystal;
       const mWine = missing * cost.wine;
 
-      neededResRow.innerHTML = `
-        <span class="res-chip" title="Falta ${mWood.toLocaleString()} madera">
+      colMats.innerHTML = `
+        <span class="res-chip-mini" title="Madera: ${mWood.toLocaleString()}">
           <img src="assets/resources/wood.png" alt="Madera">
           <span>${formatResNum(mWood)}</span>
         </span>
       `;
       if (mSulfur > 0) {
-        neededResRow.innerHTML += `
-          <span class="res-chip" title="Falta ${mSulfur.toLocaleString()} azufre">
+        colMats.innerHTML += `
+          <span class="res-chip-mini" title="Azufre: ${mSulfur.toLocaleString()}">
             <img src="assets/resources/sulfur.png" alt="Azufre">
             <span>${formatResNum(mSulfur)}</span>
           </span>
         `;
       }
       if (mCrystal > 0) {
-        neededResRow.innerHTML += `
-          <span class="res-chip" title="Falta ${mCrystal.toLocaleString()} cristal">
+        colMats.innerHTML += `
+          <span class="res-chip-mini" title="Cristal: ${mCrystal.toLocaleString()}">
             <img src="assets/resources/glass.png" alt="Cristal">
             <span>${formatResNum(mCrystal)}</span>
           </span>
         `;
       }
       if (mWine > 0) {
-        neededResRow.innerHTML += `
-          <span class="res-chip" title="Falta ${mWine.toLocaleString()} vino">
+        colMats.innerHTML += `
+          <span class="res-chip-mini" title="Vino: ${mWine.toLocaleString()}">
             <img src="assets/resources/wine.png" alt="Vino">
             <span>${formatResNum(mWine)}</span>
           </span>
         `;
       }
     } else {
-      neededResRow.innerHTML = `<span style="color:#2e7d32;font-size:9px;font-weight:bold;">✔️ Meta lista</span>`;
+      colMats.innerHTML = `<span class="res-chip-done" title="Meta alcanzada">✔️</span>`;
     }
 
-    card.appendChild(header);
-    card.appendChild(controls);
-    card.appendChild(neededResRow);
+    card.appendChild(colIdentity);
+    card.appendChild(colInputs);
+    card.appendChild(colMats);
     grid.appendChild(card);
   });
 
