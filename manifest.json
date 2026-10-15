@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Ikariam Build Planner",
+  "version": "1.0",
+  "description": "Planificador de construcción y niveles en Ikariam",
+  "permissions": ["storage", "sidePanel"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Abrir panel de Ikariam"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  }
+}

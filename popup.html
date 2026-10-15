@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ikariam Build Planner</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="tabs-container" id="tabs"></div>
+  <div class="building-meta-summary" id="meta-summary"></div>
+  <div class="content" id="content"></div>
+  
+  <!-- Botón flotante de edición y configuración -->
+  <button id="btn-settings" class="floating-btn settings-btn" title="Configuración">⚙️</button>
+  <button id="btn-edit" class="floating-btn edit-mode-off" title="Editar niveles y checkpoints">✏️</button>
+  
+  <!-- Overlay de Configuración -->
+  <div id="settings-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h2>Configuración</h2>
+        <button id="btn-close-settings" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <!-- Copia de seguridad (Importar/Exportar) -->
+        <div class="settings-section">
+          <h3>Copia de Seguridad</h3>
+          <p class="section-desc">Copia tus datos actuales o importa una copia existente en formato JSON.</p>
+          <div class="backup-actions">
+            <button id="btn-export" class="btn-action">Exportar</button>
+            <button id="btn-import" class="btn-action">Importar</button>
+          </div>
+          <textarea id="txt-backup" class="backup-textarea hidden" placeholder="Pega el código JSON aquí para importar..."></textarea>
+          <div id="backup-status" class="status-msg"></div>
+        </div>
+        
+        <!-- Número de Ciudades -->
+        <div class="settings-section">
+          <h3>Número de Ciudades</h3>
+          <p class="section-desc">Cuántas ciudades tienes activas (máx 13). Las demás se ocultan.</p>
+          <div class="city-count-row">
+            <input id="input-city-count" type="number" min="1" max="13" value="13" class="city-count-input">
+            <button id="btn-apply-city-count" class="btn-action primary">Aplicar</button>
+          </div>
+        </div>
+        
+        <!-- Nombres de Ciudades -->
+        <div class="settings-section">
+          <h3>Nombres de Ciudades</h3>
+          <p class="section-desc">Personaliza el nombre completo y la abreviatura (máx 6 chars) que se muestra en las filas.</p>
+          <div id="city-rename-list" class="city-rename-list"></div>
+          <button id="btn-save-cities" class="btn-action primary" style="margin-top:8px;width:100%;">Guardar Nombres</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
