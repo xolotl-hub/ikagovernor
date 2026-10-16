@@ -7,6 +7,9 @@ body {
   background-color: #f4eccd;
   color: #333;
 }
+.hidden {
+  display: none !important;
+}
 .tabs-wrapper {
   position: relative;
   display: flex;
