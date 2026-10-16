@@ -804,13 +804,50 @@ body {
   line-height: 1;
 }
 
+.troops-tabs-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: #d8ceb0;
+  border-bottom: 2px solid #b14329;
+}
 .troops-city-tabs {
   display: flex;
   overflow-x: auto;
-  background-color: #d8ceb0;
-  padding: 4px 6px 0 6px;
+  background-color: transparent;
+  padding: 4px 36px 0 6px;
   gap: 4px;
-  border-bottom: 2px solid #b14329;
+  border-bottom: none;
+  flex-grow: 1;
+}
+.btn-global-meta {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #c2b58b;
+  background: #e5dcb7;
+  color: #555;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  z-index: 30;
+  transition: all 0.2s ease;
+}
+.btn-global-meta:hover {
+  background: #b14329;
+  color: white;
+}
+.btn-global-meta.active {
+  background: #b14329;
+  color: white;
+  border-color: #8c321d;
 }
 .troop-city-tab {
   display: flex;
@@ -1070,5 +1107,156 @@ body {
 /* Vista Configuración Integrada */
 .settings-view-container {
   padding: 12px;
+}
+
+/* ========================================================
+   PANEL: CONFIGURACIÓN GLOBAL DE META DE TROPAS
+   ======================================================== */
+.troops-meta-panel {
+  padding: 8px;
+}
+.meta-panel-header {
+  background: #ebdcb5;
+  border: 1px solid #c2b58b;
+  border-radius: 5px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+}
+.meta-panel-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #4a3b2c;
+  display: block;
+}
+.meta-panel-desc {
+  font-size: 10px;
+  color: #666;
+  margin: 3px 0 0 0;
+}
+.meta-city-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+  background: #faf4e1;
+  border: 1px solid #d8ceb0;
+  border-radius: 5px;
+  padding: 6px;
+  align-items: center;
+}
+.meta-city-chip {
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid #c2b58b;
+  background: #e5dcb7;
+  color: #555;
+  font-size: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.meta-city-chip:hover {
+  background: #d8ceb0;
+}
+.meta-city-chip.selected {
+  background: #b14329;
+  color: #fff;
+  border-color: #8c321d;
+  box-shadow: 0 1px 3px rgba(177, 67, 41, 0.3);
+}
+.meta-city-chip.toggle-all {
+  background: #3b6e8c;
+  color: #fff;
+  border-color: #2b5269;
+}
+.meta-city-chip.toggle-all:hover {
+  background: #2f5870;
+}
+.meta-section-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #4a3b2c;
+  background: #ebdcb5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #c2b58b;
+  margin-bottom: 6px;
+}
+.meta-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+}
+@media (min-width: 440px) {
+  .meta-catalog-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.meta-grid-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #faf4e1;
+  border: 1px solid #d8ceb0;
+  border-radius: 5px;
+  padding: 6px 4px;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-sizing: border-box;
+}
+.meta-card-icon-wrap {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fdfaf2;
+  border: 1px solid #c2b58b;
+  border-radius: 4px;
+}
+.meta-card-icon-wrap img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.meta-grid-card .meta-card-name {
+  font-size: 9px;
+  font-weight: bold;
+  color: #4a3b2c;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.meta-grid-card .meta-card-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 9px;
+  color: #555;
+  font-weight: bold;
+  width: 100%;
+}
+.meta-grid-card input {
+  width: 44px;
+  height: 19px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  border: 1px solid #c2b58b;
+  border-radius: 3px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.meta-grid-card input:focus {
+  outline: none;
+  border-color: #b14329;
+}
+.meta-panel-footer {
+  margin-top: 10px;
+  padding: 4px 0 10px 0;
 }
 

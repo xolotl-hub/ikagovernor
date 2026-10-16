@@ -86,7 +86,12 @@ let troopsData = {
   cities: {}
 };
 
-let cityToDelete = null;
+// Temp storage for meta panel inputs (unitId -> input element)
+let metaPanelInputs = { units: {}, ships: {} };
+let isMetaPanelOpen = false;
+let selectedMetaCities = new Set();
+
+
 
 function formatResNum(num) {
   if (!num || num <= 0) return '0';
@@ -999,7 +1004,7 @@ function renderTroopCityTabs() {
 
   cities.forEach(city => {
     const tab = document.createElement('div');
-    const isActive = city === troopsData.activeTroopCity;
+    const isActive = !isMetaPanelOpen && (city === troopsData.activeTroopCity);
     tab.className = `troop-city-tab ${isActive ? 'active' : ''}`;
     
     const label = cityLabels[city];
@@ -1010,7 +1015,11 @@ function renderTroopCityTabs() {
     tab.title = fullName;
 
     tab.onclick = () => {
-      if (troopsData.activeTroopCity !== city) {
+      const wasOpen = isMetaPanelOpen;
+      if (isMetaPanelOpen) {
+        closeMetaPanel();
+      }
+      if (troopsData.activeTroopCity !== city || wasOpen) {
         troopsData.activeTroopCity = city;
         renderTroopCityTabs();
         renderTroopsContent();
@@ -1257,6 +1266,189 @@ function renderTroopsContent() {
 
   renderMilitarySection("🛡️ Tropas Terrestres", "units", TROOP_DEFINITIONS.units, unitsMap);
   renderMilitarySection("⛵ Barcos de Guerra", "ships", TROOP_DEFINITIONS.ships, shipsMap);
+}
+
+// ========================================================
+// PANEL: CONFIGURACIÓN GLOBAL DE METAS DE TROPAS
+// ========================================================
+function openMetaPanel() {
+  isMetaPanelOpen = true;
+  const panel = document.getElementById('troops-meta-panel');
+  const content = document.getElementById('troops-content');
+  const btn = document.getElementById('btn-global-meta');
+  
+  if (panel) panel.classList.remove('hidden');
+  if (content) content.classList.add('hidden');
+  if (btn) btn.classList.add('active');
+
+  // Si no hay ciudades seleccionadas previamente, seleccionar todas por defecto
+  if (selectedMetaCities.size === 0) {
+    cities.forEach(c => selectedMetaCities.add(c));
+  }
+
+  renderTroopCityTabs();
+  renderMetaPanel();
+}
+
+function closeMetaPanel() {
+  isMetaPanelOpen = false;
+  const panel = document.getElementById('troops-meta-panel');
+  const content = document.getElementById('troops-content');
+  const btn = document.getElementById('btn-global-meta');
+  
+  if (panel) panel.classList.add('hidden');
+  if (content) content.classList.remove('hidden');
+  if (btn) btn.classList.remove('active');
+
+  renderTroopCityTabs();
+}
+
+function renderMetaPanel() {
+  // 1. Selector de ciudades (chips interactivos)
+  const chipsContainer = document.getElementById('meta-city-chips');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
+
+    // Botón para marcar / desmarcar todas
+    const toggleAllBtn = document.createElement('span');
+    toggleAllBtn.className = 'meta-city-chip toggle-all';
+    const allSelected = cities.length > 0 && cities.every(c => selectedMetaCities.has(c));
+    toggleAllBtn.textContent = allSelected ? '✖ Desmarcar todas' : '✓ Marcar todas';
+    toggleAllBtn.onclick = () => {
+      if (allSelected) {
+        selectedMetaCities.clear();
+      } else {
+        cities.forEach(c => selectedMetaCities.add(c));
+      }
+      renderMetaPanel();
+    };
+    chipsContainer.appendChild(toggleAllBtn);
+
+    cities.forEach(city => {
+      const chip = document.createElement('span');
+      const isSelected = selectedMetaCities.has(city);
+      chip.className = `meta-city-chip ${isSelected ? 'selected' : ''}`;
+      
+      const label = cityLabels[city];
+      const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+      const fullName = (label && label.name) ? label.name : city;
+      chip.textContent = shortCode;
+      chip.title = fullName;
+
+      chip.onclick = () => {
+        if (selectedMetaCities.has(city)) {
+          selectedMetaCities.delete(city);
+        } else {
+          selectedMetaCities.add(city);
+        }
+        renderMetaPanel();
+      };
+      chipsContainer.appendChild(chip);
+    });
+  }
+
+  // 2. Cuadrícula de Unidades y Barcos (Imagen + Meta)
+  const renderCatalogGrid = (containerId, categoryKey, list) => {
+    const grid = document.getElementById(containerId);
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    list.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'meta-grid-card';
+
+      const existingVal = (metaPanelInputs[categoryKey] && metaPanelInputs[categoryKey][item.id] !== undefined)
+        ? metaPanelInputs[categoryKey][item.id]
+        : '';
+
+      card.innerHTML = `
+        <div class="meta-card-icon-wrap" title="${item.name}">
+          <img src="${item.icon}" alt="${item.name}">
+        </div>
+        <span class="meta-card-name" title="${item.name}">${item.name}</span>
+        <div class="meta-card-input-row">
+          <label>Meta:</label>
+          <input type="number" min="0" placeholder="0" class="troop-input-num" value="${existingVal}">
+        </div>
+      `;
+
+      const input = card.querySelector('input');
+      input.addEventListener('input', () => {
+        const val = input.value.trim();
+        if (!metaPanelInputs[categoryKey]) metaPanelInputs[categoryKey] = {};
+        metaPanelInputs[categoryKey][item.id] = val;
+      });
+
+      grid.appendChild(card);
+    });
+  };
+
+  renderCatalogGrid('meta-units-grid', 'units', TROOP_DEFINITIONS.units);
+  renderCatalogGrid('meta-ships-grid', 'ships', TROOP_DEFINITIONS.ships);
+}
+
+function applyGlobalMeta() {
+  if (selectedMetaCities.size === 0) {
+    alert('Por favor selecciona al menos una ciudad para aplicar las metas.');
+    return;
+  }
+
+  selectedMetaCities.forEach(cityId => {
+    if (!troopsData.cities[cityId]) {
+      troopsData.cities[cityId] = { units: {}, ships: {} };
+    }
+    if (!troopsData.cities[cityId].units) troopsData.cities[cityId].units = {};
+    if (!troopsData.cities[cityId].ships) troopsData.cities[cityId].ships = {};
+
+    // Inyectar metas de tropas terrestres
+    TROOP_DEFINITIONS.units.forEach(unit => {
+      const valStr = metaPanelInputs.units ? metaPanelInputs.units[unit.id] : undefined;
+      if (valStr !== undefined && valStr !== '') {
+        const num = Math.max(0, parseInt(valStr, 10) || 0);
+        if (!troopsData.cities[cityId].units[unit.id]) {
+          troopsData.cities[cityId].units[unit.id] = { actual: 0, desired: num };
+        } else {
+          troopsData.cities[cityId].units[unit.id].desired = num;
+        }
+      }
+    });
+
+    // Inyectar metas de barcos de guerra
+    TROOP_DEFINITIONS.ships.forEach(ship => {
+      const valStr = metaPanelInputs.ships ? metaPanelInputs.ships[ship.id] : undefined;
+      if (valStr !== undefined && valStr !== '') {
+        const num = Math.max(0, parseInt(valStr, 10) || 0);
+        if (!troopsData.cities[cityId].ships[ship.id]) {
+          troopsData.cities[cityId].ships[ship.id] = { actual: 0, desired: num };
+        } else {
+          troopsData.cities[cityId].ships[ship.id].desired = num;
+        }
+      }
+    });
+  });
+
+  saveTroopsData();
+  closeMetaPanel();
+  renderTroopsContent();
+  renderSummary();
+}
+
+function setupGlobalMetaPanel() {
+  const btn = document.getElementById('btn-global-meta');
+  if (btn) {
+    btn.onclick = () => {
+      if (isMetaPanelOpen) {
+        closeMetaPanel();
+      } else {
+        openMetaPanel();
+      }
+    };
+  }
+
+  const btnApply = document.getElementById('btn-apply-meta');
+  if (btnApply) {
+    btnApply.onclick = applyGlobalMeta;
+  }
 }
 
 // Modal: Añadir Tropas / Barcos
@@ -1680,6 +1872,10 @@ function setupNavigation() {
 
     btnEdit.style.display = (targetView === 'construction') ? 'flex' : 'none';
 
+    if (targetView !== 'troops' && isMetaPanelOpen) {
+      closeMetaPanel();
+    }
+
     if (targetView === 'summary') {
       navSummary.classList.add('active');
       viewSummary.classList.remove('hidden');
@@ -1694,7 +1890,11 @@ function setupNavigation() {
       navTroops.classList.add('active');
       viewTroops.classList.remove('hidden');
       renderTroopCityTabs();
-      renderTroopsContent();
+      if (isMetaPanelOpen) {
+        renderMetaPanel();
+      } else {
+        renderTroopsContent();
+      }
     } else if (targetView === 'settings') {
       navSettings.classList.add('active');
       viewSettings.classList.remove('hidden');
@@ -1730,6 +1930,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEditButton();
     setupReorderBuildingsButton();
     setupSettingsHandlers();
+    setupGlobalMetaPanel();
     renderTabs();
     renderMetaSummary();
     renderContent();

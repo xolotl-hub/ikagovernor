@@ -45,8 +45,29 @@
       <span class="troops-top-title">⚔️ Guarnición de la Ciudad</span>
     </div>
     
-    <!-- Pestañas horizontales de ciudades en tropas -->
-    <div class="troops-city-tabs" id="troops-city-tabs"></div>
+    <!-- Pestañas horizontales de ciudades en tropas + botón config global -->
+    <div class="troops-tabs-row">
+      <div class="troops-city-tabs" id="troops-city-tabs"></div>
+      <button id="btn-global-meta" class="btn-global-meta" title="Configurar Meta global de tropas">🎯</button>
+    </div>
+
+    <!-- Panel: Configuración Global de Meta (reemplaza troops-content) -->
+    <div id="troops-meta-panel" class="troops-meta-panel hidden">
+      <div class="meta-panel-header">
+        <span class="meta-panel-title">🎯 Meta Global de Tropas</span>
+        <p class="meta-panel-desc">Define las metas y aplícalas a las ciudades que selecciones:</p>
+      </div>
+      <div id="meta-city-chips" class="meta-city-chips"></div>
+      <div class="meta-panel-body">
+        <div class="meta-section-label">🛡️ Tropas Terrestres</div>
+        <div id="meta-units-grid" class="meta-catalog-grid"></div>
+        <div class="meta-section-label" style="margin-top:8px;">⛵ Barcos de Guerra</div>
+        <div id="meta-ships-grid" class="meta-catalog-grid"></div>
+      </div>
+      <div class="meta-panel-footer">
+        <button id="btn-apply-meta" class="btn-action primary" style="width:100%;">✔️ Aplicar a ciudades seleccionadas</button>
+      </div>
+    </div>
 
     <!-- Contenedor del contenido militar de la ciudad seleccionada -->
     <div class="troops-content" id="troops-content"></div>
