@@ -688,33 +688,42 @@ body {
   border-bottom: 1px solid #c2b58b;
   gap: 6px;
 }
-.troops-type-selector {
-  display: flex;
-  gap: 4px;
+.troops-top-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #4a3b2c;
 }
 .troops-actions-bar {
   display: flex;
   gap: 4px;
 }
-.troops-subtab {
+.military-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ebdcb5;
   padding: 4px 8px;
-  border: 1px solid #c2b58b;
-  background-color: #f4eccd;
-  color: #555;
-  font-weight: bold;
-  font-size: 11px;
   border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  margin-top: 8px;
+  margin-bottom: 5px;
+  border: 1px solid #c2b58b;
 }
-.troops-subtab:hover {
-  background-color: #ebdcb5;
+.military-section-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #4a3b2c;
 }
-.troops-subtab.active {
-  background-color: #b14329;
-  color: white;
-  border-color: #933620;
+.military-header-actions {
+  display: flex;
+  gap: 4px;
 }
+.btn-mini {
+  padding: 2px 7px;
+  font-size: 10px;
+  height: 22px;
+  line-height: 1;
+}
+
 .troops-city-tabs {
   display: flex;
   overflow-x: auto;
@@ -771,7 +780,7 @@ body {
   border: 1px solid #c2b58b;
   border-radius: 6px;
   padding: 6px 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -790,10 +799,10 @@ body {
 /* Cuadrícula de 3 por línea */
 .troop-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 6px;
 }
-@media (min-width: 420px) {
+@media (min-width: 440px) {
   .troop-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -806,28 +815,28 @@ body {
   background: #faf4e1;
   border: 1px solid #d8ceb0;
   border-radius: 5px;
-  padding: 4px 5px;
-  gap: 4px;
+  padding: 4px 6px;
+  gap: 6px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   box-sizing: border-box;
   min-width: 0;
 }
 
-/* Columna 1: Imagen más grande + Nombre */
+/* Columna 1: Imagen 2x más grande + Nombre */
 .troop-col-identity {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 42px;
+  width: 56px;
   flex-shrink: 0;
   gap: 2px;
 }
 .troop-icon-container {
-  width: 36px;
-  height: 36px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: #fdfaf2;
   border: 1px solid #c2b58b;
   display: flex;
@@ -835,8 +844,8 @@ body {
   align-items: center;
 }
 .troop-icon-container img {
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
 }
 .troop-name {

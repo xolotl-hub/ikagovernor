@@ -883,41 +883,41 @@ function renderTroopsContent() {
     return;
   }
 
-  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
   if (!troopsData.cities[city]) {
     troopsData.cities[city] = { units: {}, ships: {} };
   }
-  const typeKey = troopsData.activeTroopType;
-  if (!troopsData.cities[city][typeKey]) {
-    troopsData.cities[city][typeKey] = {};
-  }
-  const cityTroops = troopsData.cities[city][typeKey];
+  if (!troopsData.cities[city].units) troopsData.cities[city].units = {};
+  if (!troopsData.cities[city].ships) troopsData.cities[city].ships = {};
 
-  // FILTRO: "tropas que no existen, tropas que no aparecen"
-  const visibleTroops = list.filter(unit => {
-    const data = cityTroops[unit.id];
-    return data && ((data.actual && data.actual > 0) || (data.desired && data.desired > 0));
-  });
+  const unitsMap = troopsData.cities[city].units;
+  const shipsMap = troopsData.cities[city].ships;
 
-  // Cálculo de totales faltantes
+  // Cálculo de totales combinados (Tropas + Barcos)
   let totalMissingWood = 0;
   let totalMissingSulfur = 0;
   let totalMissingCrystal = 0;
   let totalMissingWine = 0;
 
-  visibleTroops.forEach(unit => {
-    const data = cityTroops[unit.id];
-    const missing = Math.max(0, (data.desired || 0) - (data.actual || 0));
-    if (missing > 0) {
-      const cost = getUnitCostInCity(unit, city);
-      totalMissingWood += missing * cost.wood;
-      totalMissingSulfur += missing * cost.sulfur;
-      totalMissingCrystal += missing * cost.crystal;
-      totalMissingWine += missing * cost.wine;
-    }
-  });
+  const calculateTotals = (list, map) => {
+    list.forEach(item => {
+      const data = map[item.id];
+      if (data) {
+        const missing = Math.max(0, (data.desired || 0) - (data.actual || 0));
+        if (missing > 0) {
+          const cost = getUnitCostInCity(item, city);
+          totalMissingWood += missing * cost.wood;
+          totalMissingSulfur += missing * cost.sulfur;
+          totalMissingCrystal += missing * cost.crystal;
+          totalMissingWine += missing * cost.wine;
+        }
+      }
+    });
+  };
 
-  // Tarjeta de resumen
+  calculateTotals(TROOP_DEFINITIONS.units, unitsMap);
+  calculateTotals(TROOP_DEFINITIONS.ships, shipsMap);
+
+  // Tarjeta de resumen general de materiales
   const summaryCard = document.createElement('div');
   summaryCard.className = 'troop-summary-card';
   const label = cityLabels[city];
@@ -925,7 +925,7 @@ function renderTroopsContent() {
 
   summaryCard.innerHTML = `
     <div class="troop-summary-title">
-      <span>Materiales requeridos para objetivo en <strong>${cityName}</strong>:</span>
+      <span>Materiales requeridos en <strong>${cityName}</strong> (Tropas y Barcos):</span>
     </div>
     <div class="troop-summary-resources">
       <span class="res-chip" title="Madera faltante: ${totalMissingWood.toLocaleString()}">
@@ -954,136 +954,161 @@ function renderTroopsContent() {
   `;
   container.appendChild(summaryCard);
 
-  if (visibleTroops.length === 0) {
-    const emptyNotice = document.createElement('div');
-    emptyNotice.className = 'no-troops-msg';
-    emptyNotice.innerHTML = `
-      <p>No hay tropas registradas en esta ciudad.</p>
-      <button id="btn-add-troops-empty" class="btn-action primary" style="max-width:160px;margin:10px auto;">+ Añadir Tropa</button>
-    `;
-    container.appendChild(emptyNotice);
-    document.getElementById('btn-add-troops-empty').onclick = openAddTroopsModal;
-    return;
-  }
-
-  // Cuadrícula 2 por línea
-  const grid = document.createElement('div');
-  grid.className = 'troop-grid';
-
-  visibleTroops.forEach(unit => {
-    const unitData = cityTroops[unit.id];
-    const cost = getUnitCostInCity(unit, city);
-    const missing = Math.max(0, (unitData.desired || 0) - (unitData.actual || 0));
-
-    const card = document.createElement('div');
-    card.className = 'troop-card';
-
-    // Columna 1: Imagen más grande + Nombre
-    const colIdentity = document.createElement('div');
-    colIdentity.className = 'troop-col-identity';
-    colIdentity.innerHTML = `
-      <div class="troop-icon-container">
-        <img src="${unit.icon}" alt="${unit.name}">
+  // Función para renderizar una sección militar (Tropas o Barcos)
+  const renderMilitarySection = (title, categoryKey, list, map) => {
+    const secHeader = document.createElement('div');
+    secHeader.className = 'military-section-header';
+    secHeader.innerHTML = `
+      <span class="military-section-title">${title}</span>
+      <div class="military-header-actions">
+        <button class="btn-action primary btn-mini btn-sec-add">+ Añadir</button>
+        <button class="btn-action btn-mini btn-sec-update">⚡ Actualizar</button>
       </div>
-      <span class="troop-name" title="${unit.name}">${unit.name}</span>
     `;
 
-    // Columna 2: Inputs Real y Meta
-    const colInputs = document.createElement('div');
-    colInputs.className = 'troop-col-inputs';
+    secHeader.querySelector('.btn-sec-add').onclick = () => openAddTroopsModal(categoryKey);
+    secHeader.querySelector('.btn-sec-update').onclick = () => openUpdateTroopsModal(categoryKey);
+    container.appendChild(secHeader);
 
-    // Fila Real
-    const rowReal = document.createElement('div');
-    rowReal.className = 'troop-field-row';
-    rowReal.innerHTML = `<label title="Cantidad real">R:</label>`;
-    const inputReal = document.createElement('input');
-    inputReal.type = 'number';
-    inputReal.className = 'troop-input-num';
-    inputReal.min = '0';
-    inputReal.value = unitData.actual || 0;
-    inputReal.onchange = () => {
-      const val = parseInt(inputReal.value, 10);
-      unitData.actual = isNaN(val) ? 0 : Math.max(0, val);
-      saveTroopsData();
-      renderTroopsContent();
-    };
-    rowReal.appendChild(inputReal);
+    // Filtrar existentes
+    const visibleItems = list.filter(item => {
+      const data = map[item.id];
+      return data && ((data.actual && data.actual > 0) || (data.desired && data.desired > 0));
+    });
 
-    // Fila Meta
-    const rowMeta = document.createElement('div');
-    rowMeta.className = 'troop-field-row';
-    rowMeta.innerHTML = `<label title="Cantidad deseada">M:</label>`;
-    const inputMeta = document.createElement('input');
-    inputMeta.type = 'number';
-    inputMeta.className = 'troop-input-num';
-    inputMeta.min = '0';
-    inputMeta.value = unitData.desired || 0;
-    inputMeta.onchange = () => {
-      const val = parseInt(inputMeta.value, 10);
-      unitData.desired = isNaN(val) ? 0 : Math.max(0, val);
-      saveTroopsData();
-      renderTroopsContent();
-    };
-    rowMeta.appendChild(inputMeta);
-
-    colInputs.appendChild(rowReal);
-    colInputs.appendChild(rowMeta);
-
-    // Columna 3: Materiales en pila vertical
-    const colMats = document.createElement('div');
-    colMats.className = 'troop-col-mats';
-
-    if (missing > 0) {
-      const mWood = missing * cost.wood;
-      const mSulfur = missing * cost.sulfur;
-      const mCrystal = missing * cost.crystal;
-      const mWine = missing * cost.wine;
-
-      colMats.innerHTML = `
-        <span class="res-chip-mini" title="Madera: ${mWood.toLocaleString()}">
-          <img src="assets/resources/wood.png" alt="Madera">
-          <span>${formatResNum(mWood)}</span>
-        </span>
+    if (visibleItems.length === 0) {
+      const emptyBox = document.createElement('div');
+      emptyBox.className = 'no-troops-msg';
+      emptyBox.style.padding = '10px 5px';
+      emptyBox.innerHTML = `
+        <span style="font-size:11px;">No hay registros en esta sección.</span>
+        <button class="btn-action primary btn-mini" style="margin-left:6px;">+ Añadir</button>
       `;
-      if (mSulfur > 0) {
-        colMats.innerHTML += `
-          <span class="res-chip-mini" title="Azufre: ${mSulfur.toLocaleString()}">
-            <img src="assets/resources/sulfur.png" alt="Azufre">
-            <span>${formatResNum(mSulfur)}</span>
-          </span>
-        `;
-      }
-      if (mCrystal > 0) {
-        colMats.innerHTML += `
-          <span class="res-chip-mini" title="Cristal: ${mCrystal.toLocaleString()}">
-            <img src="assets/resources/glass.png" alt="Cristal">
-            <span>${formatResNum(mCrystal)}</span>
-          </span>
-        `;
-      }
-      if (mWine > 0) {
-        colMats.innerHTML += `
-          <span class="res-chip-mini" title="Vino: ${mWine.toLocaleString()}">
-            <img src="assets/resources/wine.png" alt="Vino">
-            <span>${formatResNum(mWine)}</span>
-          </span>
-        `;
-      }
-    } else {
-      colMats.innerHTML = `<span class="res-chip-done" title="Meta alcanzada">✔️</span>`;
+      emptyBox.querySelector('button').onclick = () => openAddTroopsModal(categoryKey);
+      container.appendChild(emptyBox);
+      return;
     }
 
-    card.appendChild(colIdentity);
-    card.appendChild(colInputs);
-    card.appendChild(colMats);
-    grid.appendChild(card);
-  });
+    const grid = document.createElement('div');
+    grid.className = 'troop-grid';
 
-  container.appendChild(grid);
+    visibleItems.forEach(item => {
+      const itemData = map[item.id];
+      const cost = getUnitCostInCity(item, city);
+      const missing = Math.max(0, (itemData.desired || 0) - (itemData.actual || 0));
+
+      const card = document.createElement('div');
+      card.className = 'troop-card';
+
+      // Columna 1: Imagen 2x más grande + Nombre
+      const colIdentity = document.createElement('div');
+      colIdentity.className = 'troop-col-identity';
+      colIdentity.innerHTML = `
+        <div class="troop-icon-container">
+          <img src="${item.icon}" alt="${item.name}">
+        </div>
+        <span class="troop-name" title="${item.name}">${item.name}</span>
+      `;
+
+      // Columna 2: Inputs Real y Meta
+      const colInputs = document.createElement('div');
+      colInputs.className = 'troop-col-inputs';
+
+      const rowReal = document.createElement('div');
+      rowReal.className = 'troop-field-row';
+      rowReal.innerHTML = `<label title="Cantidad real">R:</label>`;
+      const inputReal = document.createElement('input');
+      inputReal.type = 'number';
+      inputReal.className = 'troop-input-num';
+      inputReal.min = '0';
+      inputReal.value = itemData.actual || 0;
+      inputReal.onchange = () => {
+        const val = parseInt(inputReal.value, 10);
+        itemData.actual = isNaN(val) ? 0 : Math.max(0, val);
+        saveTroopsData();
+        renderTroopsContent();
+      };
+      rowReal.appendChild(inputReal);
+
+      const rowMeta = document.createElement('div');
+      rowMeta.className = 'troop-field-row';
+      rowMeta.innerHTML = `<label title="Cantidad deseada">M:</label>`;
+      const inputMeta = document.createElement('input');
+      inputMeta.type = 'number';
+      inputMeta.className = 'troop-input-num';
+      inputMeta.min = '0';
+      inputMeta.value = itemData.desired || 0;
+      inputMeta.onchange = () => {
+        const val = parseInt(inputMeta.value, 10);
+        itemData.desired = isNaN(val) ? 0 : Math.max(0, val);
+        saveTroopsData();
+        renderTroopsContent();
+      };
+      rowMeta.appendChild(inputMeta);
+
+      colInputs.appendChild(rowReal);
+      colInputs.appendChild(rowMeta);
+
+      // Columna 3: Materiales en pila vertical
+      const colMats = document.createElement('div');
+      colMats.className = 'troop-col-mats';
+
+      if (missing > 0) {
+        const mWood = missing * cost.wood;
+        const mSulfur = missing * cost.sulfur;
+        const mCrystal = missing * cost.crystal;
+        const mWine = missing * cost.wine;
+
+        colMats.innerHTML = `
+          <span class="res-chip-mini" title="Madera: ${mWood.toLocaleString()}">
+            <img src="assets/resources/wood.png" alt="Madera">
+            <span>${formatResNum(mWood)}</span>
+          </span>
+        `;
+        if (mSulfur > 0) {
+          colMats.innerHTML += `
+            <span class="res-chip-mini" title="Azufre: ${mSulfur.toLocaleString()}">
+              <img src="assets/resources/sulfur.png" alt="Azufre">
+              <span>${formatResNum(mSulfur)}</span>
+            </span>
+          `;
+        }
+        if (mCrystal > 0) {
+          colMats.innerHTML += `
+            <span class="res-chip-mini" title="Cristal: ${mCrystal.toLocaleString()}">
+              <img src="assets/resources/glass.png" alt="Cristal">
+              <span>${formatResNum(mCrystal)}</span>
+            </span>
+          `;
+        }
+        if (mWine > 0) {
+          colMats.innerHTML += `
+            <span class="res-chip-mini" title="Vino: ${mWine.toLocaleString()}">
+              <img src="assets/resources/wine.png" alt="Vino">
+              <span>${formatResNum(mWine)}</span>
+            </span>
+          `;
+        }
+      } else {
+        colMats.innerHTML = `<span class="res-chip-done" title="Meta alcanzada">✔️</span>`;
+      }
+
+      card.appendChild(colIdentity);
+      card.appendChild(colInputs);
+      card.appendChild(colMats);
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  };
+
+  // Renderizar ambas secciones en la misma vista
+  renderMilitarySection("🛡️ Tropas Terrestres", "units", TROOP_DEFINITIONS.units, unitsMap);
+  renderMilitarySection("⛵ Barcos de Guerra", "ships", TROOP_DEFINITIONS.ships, shipsMap);
 }
 
-// Modal: Añadir Tropas (Catálogo completo de la categoría actual)
-function openAddTroopsModal() {
+// Modal: Añadir Tropas / Barcos (Catálogo completo de la categoría especificada)
+function openAddTroopsModal(categoryKey = "units") {
   const city = troopsData.activeTroopCity;
   if (!city) return;
 
@@ -1092,23 +1117,25 @@ function openAddTroopsModal() {
   const container = document.getElementById('add-troops-catalog-list');
   container.innerHTML = '';
 
-  const isUnits = troopsData.activeTroopType === "units";
+  const isUnits = categoryKey === "units";
   title.textContent = isUnits ? "Añadir Tropas Terrestres" : "Añadir Barcos de Guerra";
 
-  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
-  const cityTroops = troopsData.cities[city]?.[troopsData.activeTroopType] || {};
+  const list = TROOP_DEFINITIONS[categoryKey] || [];
+  if (!troopsData.cities[city]) troopsData.cities[city] = { units: {}, ships: {} };
+  if (!troopsData.cities[city][categoryKey]) troopsData.cities[city][categoryKey] = {};
+  const cityMap = troopsData.cities[city][categoryKey];
 
   const tempInputs = {};
 
-  list.forEach(unit => {
-    const existing = cityTroops[unit.id] || { actual: 0, desired: 0 };
+  list.forEach(item => {
+    const existing = cityMap[item.id] || { actual: 0, desired: 0 };
     const row = document.createElement('div');
     row.className = 'troop-modal-row';
 
     row.innerHTML = `
       <div class="troop-modal-row-left">
-        <img src="${unit.icon}" alt="${unit.name}">
-        <span>${unit.name}</span>
+        <img src="${item.icon}" alt="${item.name}">
+        <span>${item.name}</span>
       </div>
     `;
 
@@ -1134,20 +1161,14 @@ function openAddTroopsModal() {
     row.appendChild(inputsDiv);
     container.appendChild(row);
 
-    tempInputs[unit.id] = { actInp, desInp };
+    tempInputs[item.id] = { actInp, desInp };
   });
 
   document.getElementById('btn-save-add-troops').onclick = () => {
-    if (!troopsData.cities[city]) troopsData.cities[city] = { units: {}, ships: {} };
-    if (!troopsData.cities[city][troopsData.activeTroopType]) {
-      troopsData.cities[city][troopsData.activeTroopType] = {};
-    }
-    const targetMap = troopsData.cities[city][troopsData.activeTroopType];
-
-    list.forEach(unit => {
-      const actVal = parseInt(tempInputs[unit.id].actInp.value, 10);
-      const desVal = parseInt(tempInputs[unit.id].desInp.value, 10);
-      targetMap[unit.id] = {
+    list.forEach(item => {
+      const actVal = parseInt(tempInputs[item.id].actInp.value, 10);
+      const desVal = parseInt(tempInputs[item.id].desInp.value, 10);
+      cityMap[item.id] = {
         actual: isNaN(actVal) ? 0 : Math.max(0, actVal),
         desired: isNaN(desVal) ? 0 : Math.max(0, desVal)
       };
@@ -1161,8 +1182,8 @@ function openAddTroopsModal() {
   modal.classList.remove('hidden');
 }
 
-// Modal: Actualizar Tropas (Solo existentes para post-batalla)
-function openUpdateTroopsModal() {
+// Modal: Actualizar Tropas / Barcos (Solo existentes para post-batalla)
+function openUpdateTroopsModal(categoryKey = "units") {
   const city = troopsData.activeTroopCity;
   if (!city) return;
 
@@ -1171,29 +1192,30 @@ function openUpdateTroopsModal() {
   const container = document.getElementById('update-troops-active-list');
   container.innerHTML = '';
 
-  title.textContent = `Actualizar Tropas en ${cityLabels[city]?.name || city}`;
+  const isUnits = categoryKey === "units";
+  const catName = isUnits ? "Tropas" : "Barcos";
+  title.textContent = `Actualizar ${catName} en ${cityLabels[city]?.name || city}`;
 
-  const list = TROOP_DEFINITIONS[troopsData.activeTroopType] || [];
-  const cityTroops = troopsData.cities[city]?.[troopsData.activeTroopType] || {};
+  const list = TROOP_DEFINITIONS[categoryKey] || [];
+  const cityMap = troopsData.cities[city]?.[categoryKey] || {};
 
-  // Solo mostrar tropas que tienen actual > 0 o meta > 0
-  const activeList = list.filter(u => cityTroops[u.id] && ((cityTroops[u.id].actual > 0) || (cityTroops[u.id].desired > 0)));
+  const activeList = list.filter(u => cityMap[u.id] && ((cityMap[u.id].actual > 0) || (cityMap[u.id].desired > 0)));
 
   if (activeList.length === 0) {
-    container.innerHTML = `<p style="padding:10px;text-align:center;font-size:11px;color:#666;">No hay tropas registradas en esta ciudad aún. Usa "+ Tropa" primero.</p>`;
+    container.innerHTML = `<p style="padding:10px;text-align:center;font-size:11px;color:#666;">No hay ${catName.toLowerCase()} registrados en esta ciudad aún. Usa "+ Añadir" primero.</p>`;
   }
 
   const tempInputs = {};
 
-  activeList.forEach(unit => {
-    const existing = cityTroops[unit.id] || { actual: 0, desired: 0 };
+  activeList.forEach(item => {
+    const existing = cityMap[item.id] || { actual: 0, desired: 0 };
     const row = document.createElement('div');
     row.className = 'troop-modal-row';
 
     row.innerHTML = `
       <div class="troop-modal-row-left">
-        <img src="${unit.icon}" alt="${unit.name}">
-        <span>${unit.name}</span>
+        <img src="${item.icon}" alt="${item.name}">
+        <span>${item.name}</span>
       </div>
     `;
 
@@ -1211,13 +1233,13 @@ function openUpdateTroopsModal() {
     row.appendChild(inputsDiv);
     container.appendChild(row);
 
-    tempInputs[unit.id] = actInp;
+    tempInputs[item.id] = actInp;
   });
 
   document.getElementById('btn-save-update-troops').onclick = () => {
-    activeList.forEach(unit => {
-      const actVal = parseInt(tempInputs[unit.id].value, 10);
-      cityTroops[unit.id].actual = isNaN(actVal) ? 0 : Math.max(0, actVal);
+    activeList.forEach(item => {
+      const actVal = parseInt(tempInputs[item.id].value, 10);
+      cityMap[item.id].actual = isNaN(actVal) ? 0 : Math.max(0, actVal);
     });
 
     saveTroopsData();
@@ -1323,38 +1345,14 @@ function setupNavigation() {
   navTroops.onclick = () => switchView('troops');
   navSettings.onclick = () => switchView('settings');
 
-  // Subpestañas Tropas (Unidades / Barcos)
-  const subtabUnits = document.getElementById('troops-subtab-units');
-  const subtabShips = document.getElementById('troops-subtab-ships');
-
-  subtabUnits.onclick = () => {
-    troopsData.activeTroopType = "units";
-    subtabUnits.classList.add('active');
-    subtabShips.classList.remove('active');
-    saveTroopsData();
-    renderTroopsContent();
-  };
-
-  subtabShips.onclick = () => {
-    troopsData.activeTroopType = "ships";
-    subtabShips.classList.add('active');
-    subtabUnits.classList.remove('active');
-    saveTroopsData();
-    renderTroopsContent();
-  };
-
-  // Botones de acción en Tropas
+  // Modales
   document.getElementById('btn-add-troop-city').onclick = openTroopCityModal;
   document.getElementById('btn-close-troop-city-modal').onclick = () => {
     document.getElementById('troop-city-modal').classList.add('hidden');
   };
-
-  document.getElementById('btn-open-add-troops-modal').onclick = openAddTroopsModal;
   document.getElementById('btn-close-add-troops-modal').onclick = () => {
     document.getElementById('modal-add-troops').classList.add('hidden');
   };
-
-  document.getElementById('btn-open-update-troops-modal').onclick = openUpdateTroopsModal;
   document.getElementById('btn-close-update-troops-modal').onclick = () => {
     document.getElementById('modal-update-troops').classList.add('hidden');
   };
