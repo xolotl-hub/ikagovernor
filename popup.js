@@ -1,9 +1,11 @@
-const cities = [
+const DEFAULT_CITIES = [
   "Tenochtitlan-m1", "Tenochtitlan-m2", "Tenochtitlan-a1", "Tenochtitlan-v1", 
   "Tenochtitlan-c1", "Tenochtitlan-m3", "Tenochtitlan-m4", "Tenochtitlan-a2", 
   "Tenochtitlan-v2", "Tenochtitlan-c2", "Tenochtitlan-c3", "Tenochtitlan-c4", 
   "Tenochtitlan-v3"
 ];
+
+let cities = [...DEFAULT_CITIES];
 
 const DEFAULT_BUILDINGS = [
   { name: "Intendencia", meta1: 18, meta2: 28, meta3: 36, meta4: 42, meta5: 47, meta6: 49 },
@@ -74,17 +76,17 @@ const TROOP_DEFINITIONS = {
 let buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
 let appData = {};
 let cityLabels = {};
-let activeCityCount = 13;
 let currentBuilding = null;
 let isEditing = false;
+let isReorderingBuildings = false;
 let currentView = "construction"; // "summary" | "construction" | "troops" | "settings"
 
 let troopsData = {
-  selectedCities: [],
   activeTroopCity: null,
-  activeTroopType: "units",
   cities: {}
 };
+
+let cityToDelete = null;
 
 function formatResNum(num) {
   if (!num || num <= 0) return '0';
@@ -143,23 +145,22 @@ function getInitialData() {
 }
 
 function loadData(callback) {
-  chrome.storage.local.get(['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCityCount', 'ikariamTroops'], (result) => {
+  chrome.storage.local.get(['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamCityCount', 'ikariamTroops'], (result) => {
     let updated = false;
 
-    activeCityCount = (result.ikariamCityCount && result.ikariamCityCount >= 1)
-      ? Math.min(result.ikariamCityCount, cities.length)
-      : cities.length;
+    // Cargar lista de ciudades
+    if (result.ikariamCitiesList && Array.isArray(result.ikariamCitiesList) && result.ikariamCitiesList.length > 0) {
+      cities = result.ikariamCitiesList;
+    } else if (result.ikariamCityCount && result.ikariamCityCount >= 1) {
+      cities = DEFAULT_CITIES.slice(0, result.ikariamCityCount);
+      saveCitiesList();
+    } else {
+      cities = [...DEFAULT_CITIES];
+      saveCitiesList();
+    }
 
     if (result.ikariamCityLabels) {
       cityLabels = result.ikariamCityLabels;
-      let needsSave = false;
-      Object.keys(cityLabels).forEach(city => {
-        if (typeof cityLabels[city] === 'string') {
-          delete cityLabels[city];
-          needsSave = true;
-        }
-      });
-      if (needsSave) saveCityLabels();
     } else {
       cityLabels = {};
     }
@@ -173,12 +174,18 @@ function loadData(callback) {
         loadedBuildings.push(b);
       });
 
+      // Sincronizar conservando el orden guardado por el usuario
       const syncedBuildings = [];
+      loadedBuildings.forEach(b => {
+        const defB = DEFAULT_BUILDINGS.find(d => d.name === b.name);
+        if (defB) {
+          syncedBuildings.push({ ...defB, ...b });
+        }
+      });
+
+      // Añadir edificios por defecto que falten
       DEFAULT_BUILDINGS.forEach(defB => {
-        const found = loadedBuildings.find(b => b.name === defB.name);
-        if (found) {
-          syncedBuildings.push({ ...defB, ...found });
-        } else {
+        if (!syncedBuildings.some(b => b.name === defB.name)) {
           syncedBuildings.push({ ...defB });
           updated = true;
         }
@@ -199,7 +206,7 @@ function loadData(callback) {
           updated = true;
         }
 
-        // Migración: Si existen Deposito 1 o Deposito 2 como claves sueltas, unificarlas en Depósito: [d1, d2]
+        // Migración a Depósito: [d1, d2]
         if (appData[city]["Deposito 1"] !== undefined || appData[city]["Deposito 2"] !== undefined) {
           const d1 = appData[city]["Deposito 1"] || 0;
           const d2 = appData[city]["Deposito 2"] || 0;
@@ -230,17 +237,13 @@ function loadData(callback) {
     // Cargar tropas
     if (result.ikariamTroops) {
       troopsData = result.ikariamTroops;
-      if (!troopsData.selectedCities) troopsData.selectedCities = [];
       if (!troopsData.cities) troopsData.cities = {};
-      if (!troopsData.activeTroopType) troopsData.activeTroopType = "units";
-      if (!troopsData.activeTroopCity && troopsData.selectedCities.length > 0) {
-        troopsData.activeTroopCity = troopsData.selectedCities[0];
+      if (!troopsData.activeTroopCity || !cities.includes(troopsData.activeTroopCity)) {
+        troopsData.activeTroopCity = cities[0] || null;
       }
     } else {
       troopsData = {
-        selectedCities: [cities[0]],
-        activeTroopCity: cities[0],
-        activeTroopType: "units",
+        activeTroopCity: cities[0] || null,
         cities: {}
       };
       saveTroopsData();
@@ -253,8 +256,13 @@ function loadData(callback) {
 function saveData() {
   chrome.storage.local.set({ 
     ikariamLevels: appData,
-    ikariamBuildings: buildingsConfig
+    ikariamBuildings: buildingsConfig,
+    ikariamCitiesList: cities
   });
+}
+
+function saveCitiesList() {
+  chrome.storage.local.set({ ikariamCitiesList: cities });
 }
 
 function saveTroopsData() {
@@ -279,27 +287,56 @@ function renderTabs() {
   const tabsContainer = document.getElementById('tabs');
   tabsContainer.innerHTML = '';
   
-  buildingsConfig.forEach(b => {
+  let draggedBuildingIndex = null;
+
+  buildingsConfig.forEach((b, idx) => {
     const tab = document.createElement('div');
     const isActive = b.name === currentBuilding.name;
     tab.className = `tab ${isActive ? 'active' : ''}`;
     tab.textContent = b.name;
-    tab.title = b.name;
-    
-    tab.onclick = () => {
-      if (isEditing) return;
-      if (currentBuilding.name !== b.name) {
-        currentBuilding = b;
-        renderTabs();
-        renderMetaSummary();
-        renderContent();
-      }
-    };
+    tab.title = isReorderingBuildings ? `Arrastra para mover: ${b.name}` : b.name;
+
+    if (isReorderingBuildings) {
+      tab.draggable = true;
+      tab.classList.add('reorder-mode');
+
+      tab.addEventListener('dragstart', (e) => {
+        draggedBuildingIndex = idx;
+        tab.classList.add('is-dragging');
+        e.dataTransfer.setData('text/plain', idx);
+      });
+      tab.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+      tab.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const targetIndex = idx;
+        if (draggedBuildingIndex !== null && draggedBuildingIndex !== targetIndex) {
+          const moved = buildingsConfig.splice(draggedBuildingIndex, 1)[0];
+          buildingsConfig.splice(targetIndex, 0, moved);
+          saveData();
+          renderTabs();
+          renderSummary();
+        }
+      });
+      tab.addEventListener('dragend', () => {
+        tab.classList.remove('is-dragging');
+      });
+    } else {
+      tab.onclick = () => {
+        if (isEditing) return;
+        if (currentBuilding.name !== b.name) {
+          currentBuilding = b;
+          renderTabs();
+          renderMetaSummary();
+          renderContent();
+        }
+      };
+    }
     
     tabsContainer.appendChild(tab);
     
-    const tabIndex = buildingsConfig.findIndex(x => x.name === b.name);
-    if (isActive && tabIndex > 1 && b.name !== "Muralla" && b.name !== "Museo") {
+    if (!isReorderingBuildings && isActive && idx > 1 && b.name !== "Muralla" && b.name !== "Museo") {
       setTimeout(() => {
         tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       }, 50);
@@ -307,11 +344,30 @@ function renderTabs() {
   });
 }
 
+function setupReorderBuildingsButton() {
+  const btn = document.getElementById('btn-reorder-buildings');
+  btn.onclick = () => {
+    isReorderingBuildings = !isReorderingBuildings;
+    if (isReorderingBuildings) {
+      btn.textContent = '✔️';
+      btn.classList.add('active');
+      btn.title = 'Guardar y salir del modo reordenar';
+    } else {
+      btn.textContent = '↔️';
+      btn.classList.remove('active');
+      btn.title = 'Reordenar pestañas de edificios';
+      saveData();
+      renderSummary();
+    }
+    renderTabs();
+  };
+}
+
 function getActiveTargetIndex(building = currentBuilding) {
   const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
   for (let i = 0; i < metaKeys.length; i++) {
     const targetValue = building[metaKeys[i]];
-    const allMeetTarget = cities.slice(0, activeCityCount).every(city => {
+    const allMeetTarget = cities.every(city => {
       const val = appData[city]?.[building.name];
       if (building.isMulti && Array.isArray(val)) {
         return val.every(l => l >= targetValue);
@@ -376,14 +432,13 @@ function renderContent() {
   const newContent = content.cloneNode(false);
   const maxGoal = currentBuilding.meta6 || 1;
   
-  cities.slice(0, activeCityCount).forEach((city) => {
+  cities.forEach((city) => {
     const row = document.createElement('div');
     const label = cityLabels[city];
-    const shortCode = (label && label.abbr) ? label.abbr : '';
+    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
     const fullName = (label && label.name) ? label.name : city;
 
     if (currentBuilding.isMulti) {
-      // Renderizado especial de edificio multi-instancia (Depósito D1 y D2)
       row.className = 'city-row multi-instance';
 
       const nameContainer = document.createElement('div');
@@ -421,7 +476,6 @@ function renderContent() {
         progressContainer.appendChild(progressFill);
         instRow.appendChild(progressContainer);
 
-        // Coste para el siguiente nivel
         const cost = getBuildingUpgradeCost(currentBuilding.name, level, city);
         let costEl = null;
         if (cost) {
@@ -518,7 +572,6 @@ function renderContent() {
 
       row.appendChild(instancesList);
     } else {
-      // Edificio normal
       row.className = 'city-row';
       
       const cityInfo = document.createElement('div');
@@ -649,7 +702,6 @@ function renderContent() {
   content.parentNode.replaceChild(newContent, content);
 }
 
-// Configuración del botón flotante de edición
 function setupEditButton() {
   const btnEdit = document.getElementById('btn-edit');
   
@@ -696,21 +748,23 @@ function setupEditButton() {
       saveData();
       renderMetaSummary();
       renderContent();
+      renderSummary();
     }
   };
 }
 
 // ========================================================
-// VISTA: RESUMEN (PRÓXIMAS 6 CONSTRUCCIONES PRIORITARIAS)
+// VISTA: RESUMEN (6 CONSTRUCCIONES Y TOP 6 TROPAS FALTANTES)
 // ========================================================
 function renderSummary() {
-  const container = document.getElementById('summary-cards-container');
-  container.innerHTML = '';
+  // 1. Próximas 6 Construcciones
+  const bContainer = document.getElementById('summary-cards-container');
+  bContainer.innerHTML = '';
 
   const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
   const candidateTasks = [];
 
-  // Excluir Intendencia y seguir orden a partir de Depósito
+  // Excluye Intendencia y sigue el orden de buildingsConfig
   const priorityBuildings = buildingsConfig.filter(b => b.name !== "Intendencia");
 
   for (const building of priorityBuildings) {
@@ -718,7 +772,7 @@ function renderSummary() {
     const targetKey = metaKeys[targetIdx];
     const targetValue = building[targetKey];
 
-    for (let cIdx = 0; cIdx < activeCityCount; cIdx++) {
+    for (let cIdx = 0; cIdx < cities.length; cIdx++) {
       const city = cities[cIdx];
       const val = appData[city]?.[building.name];
 
@@ -755,78 +809,195 @@ function renderSummary() {
   }
 
   if (candidateTasks.length === 0) {
-    container.innerHTML = `
+    bContainer.innerHTML = `
       <div class="no-troops-msg">
         <p>🎉 ¡Todas las ciudades han alcanzado las metas actuales en los edificios prioritarios!</p>
       </div>
     `;
-    return;
+  } else {
+    candidateTasks.forEach((task, idx) => {
+      const card = document.createElement('div');
+      card.className = 'summary-card-item';
+
+      const label = cityLabels[task.city];
+      const cityCode = (label && label.abbr) ? label.abbr : task.city.replace('Tenochtitlan-', '');
+      const cityName = (label && label.name) ? label.name : task.city;
+
+      const left = document.createElement('div');
+      left.className = 'summary-card-left';
+      left.innerHTML = `
+        <div>
+          <span class="summary-rank-badge">#${idx + 1}</span>
+          <span class="summary-b-name">${task.buildingName}</span>
+        </div>
+        <div class="summary-city-name">${cityCode} (${cityName})</div>
+      `;
+
+      const right = document.createElement('div');
+      right.className = 'summary-card-right';
+      
+      let costHtml = '';
+      if (task.cost) {
+        costHtml = `
+          <div class="building-cost-tag">
+            <span class="res-chip ${task.cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${task.cost.wood.toLocaleString()}">
+              <img src="assets/resources/wood.png" alt="Madera">
+              <span>${formatResNum(task.cost.wood)}</span>
+            </span>
+            ${task.cost.marble > 0 ? `
+              <span class="res-chip ${task.cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${task.cost.marble.toLocaleString()}">
+                <img src="assets/resources/marble.png" alt="Mármol">
+                <span>${formatResNum(task.cost.marble)}</span>
+              </span>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      right.innerHTML = `
+        <div class="summary-levels">Nivel ${task.currentLevel} ➔ ${task.targetLevel}</div>
+        ${costHtml}
+      `;
+
+      card.appendChild(left);
+      card.appendChild(right);
+      bContainer.appendChild(card);
+    });
   }
 
-  candidateTasks.forEach((task, idx) => {
-    const card = document.createElement('div');
-    card.className = 'summary-card-item';
+  // 2. Top 6 Ciudades con más tropas faltantes
+  const troopsContainer = document.getElementById('summary-troops-container');
+  troopsContainer.innerHTML = '';
 
-    const label = cityLabels[task.city];
-    const cityCode = (label && label.abbr) ? label.abbr : task.city.replace('Tenochtitlan-', '');
-    const cityName = (label && label.name) ? label.name : task.city;
+  const troopDeficits = [];
 
-    const left = document.createElement('div');
-    left.className = 'summary-card-left';
-    left.innerHTML = `
-      <div>
-        <span class="summary-rank-badge">#${idx + 1}</span>
-        <span class="summary-b-name">${task.buildingName}</span>
+  cities.forEach(city => {
+    const cityTroops = troopsData.cities[city] || {};
+    const unitsMap = cityTroops.units || {};
+    const shipsMap = cityTroops.ships || {};
+
+    let totalDeficit = 0;
+    let missingWood = 0;
+    let missingSulfur = 0;
+    let missingCrystal = 0;
+    let missingWine = 0;
+
+    const calcDeficit = (list, map) => {
+      list.forEach(item => {
+        const u = map[item.id];
+        if (u) {
+          const diff = Math.max(0, (u.desired || 0) - (u.actual || 0));
+          if (diff > 0) {
+            totalDeficit += diff;
+            const cost = getUnitCostInCity(item, city);
+            missingWood += diff * cost.wood;
+            missingSulfur += diff * cost.sulfur;
+            missingCrystal += diff * cost.crystal;
+            missingWine += diff * cost.wine;
+          }
+        }
+      });
+    };
+
+    calcDeficit(TROOP_DEFINITIONS.units, unitsMap);
+    calcDeficit(TROOP_DEFINITIONS.ships, shipsMap);
+
+    if (totalDeficit > 0) {
+      troopDeficits.push({
+        city,
+        totalDeficit,
+        wood: missingWood,
+        sulfur: missingSulfur,
+        crystal: missingCrystal,
+        wine: missingWine
+      });
+    }
+  });
+
+  troopDeficits.sort((a, b) => b.totalDeficit - a.totalDeficit);
+  const top6Troops = troopDeficits.slice(0, 6);
+
+  if (top6Troops.length === 0) {
+    troopsContainer.innerHTML = `
+      <div class="no-troops-msg">
+        <p>🎉 ¡Todas las ciudades tienen sus metas de tropas y barcos al 100%!</p>
       </div>
-      <div class="summary-city-name">${cityCode} (${cityName})</div>
     `;
+  } else {
+    top6Troops.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'summary-card-item';
 
-    const right = document.createElement('div');
-    right.className = 'summary-card-right';
-    
-    let costHtml = '';
-    if (task.cost) {
-      costHtml = `
+      const label = cityLabels[item.city];
+      const cityCode = (label && label.abbr) ? label.abbr : item.city.replace('Tenochtitlan-', '');
+      const cityName = (label && label.name) ? label.name : item.city;
+
+      const left = document.createElement('div');
+      left.className = 'summary-card-left';
+      left.innerHTML = `
+        <div>
+          <span class="summary-rank-badge">#${idx + 1}</span>
+          <span class="summary-b-name">${cityCode} (${cityName})</span>
+        </div>
+        <div class="summary-troop-deficit">Faltan ${item.totalDeficit.toLocaleString()} unidades</div>
+      `;
+
+      const right = document.createElement('div');
+      right.className = 'summary-card-right';
+      right.innerHTML = `
         <div class="building-cost-tag">
-          <span class="res-chip ${task.cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${task.cost.wood.toLocaleString()}">
-            <img src="assets/resources/wood.png" alt="Madera">
-            <span>${formatResNum(task.cost.wood)}</span>
-          </span>
-          ${task.cost.marble > 0 ? `
-            <span class="res-chip ${task.cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${task.cost.marble.toLocaleString()}">
-              <img src="assets/resources/marble.png" alt="Mármol">
-              <span>${formatResNum(task.cost.marble)}</span>
+          ${item.wood > 0 ? `
+            <span class="res-chip" title="Madera: ${item.wood.toLocaleString()}">
+              <img src="assets/resources/wood.png" alt="Madera">
+              <span>${formatResNum(item.wood)}</span>
+            </span>
+          ` : ''}
+          ${item.sulfur > 0 ? `
+            <span class="res-chip" title="Azufre: ${item.sulfur.toLocaleString()}">
+              <img src="assets/resources/sulfur.png" alt="Azufre">
+              <span>${formatResNum(item.sulfur)}</span>
+            </span>
+          ` : ''}
+          ${item.crystal > 0 ? `
+            <span class="res-chip" title="Cristal: ${item.crystal.toLocaleString()}">
+              <img src="assets/resources/glass.png" alt="Cristal">
+              <span>${formatResNum(item.crystal)}</span>
+            </span>
+          ` : ''}
+          ${item.wine > 0 ? `
+            <span class="res-chip" title="Vino: ${item.wine.toLocaleString()}">
+              <img src="assets/resources/wine.png" alt="Vino">
+              <span>${formatResNum(item.wine)}</span>
             </span>
           ` : ''}
         </div>
       `;
-    }
 
-    right.innerHTML = `
-      <div class="summary-levels">Nivel ${task.currentLevel} ➔ ${task.targetLevel}</div>
-      ${costHtml}
-    `;
-
-    card.appendChild(left);
-    card.appendChild(right);
-    container.appendChild(card);
-  });
+      card.appendChild(left);
+      card.appendChild(right);
+      troopsContainer.appendChild(card);
+    });
+  }
 }
 
 // ========================================================
-// VISTA: TROPAS (2 POR LÍNEA, FILTRADAS, MODALES + Y ACTUALIZAR)
+// VISTA: TROPAS (CIUDADES AUTOMÁTICAS Y AMBAS SECCIONES)
 // ========================================================
 function renderTroopCityTabs() {
   const container = document.getElementById('troops-city-tabs');
   container.innerHTML = '';
 
-  if (troopsData.selectedCities.length === 0) {
+  if (cities.length === 0) {
     container.style.display = 'none';
     return;
   }
   container.style.display = 'flex';
 
-  troopsData.selectedCities.forEach(city => {
+  if (!troopsData.activeTroopCity || !cities.includes(troopsData.activeTroopCity)) {
+    troopsData.activeTroopCity = cities[0];
+  }
+
+  cities.forEach(city => {
     const tab = document.createElement('div');
     const isActive = city === troopsData.activeTroopCity;
     tab.className = `troop-city-tab ${isActive ? 'active' : ''}`;
@@ -838,21 +1009,6 @@ function renderTroopCityTabs() {
     tab.textContent = shortCode;
     tab.title = fullName;
 
-    const closeBtn = document.createElement('span');
-    closeBtn.className = 'troop-city-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.title = 'Quitar de la vista de tropas';
-    closeBtn.onclick = (e) => {
-      e.stopPropagation();
-      troopsData.selectedCities = troopsData.selectedCities.filter(c => c !== city);
-      if (troopsData.activeTroopCity === city) {
-        troopsData.activeTroopCity = troopsData.selectedCities[0] || null;
-      }
-      saveTroopsData();
-      renderTroopCityTabs();
-      renderTroopsContent();
-    };
-
     tab.onclick = () => {
       if (troopsData.activeTroopCity !== city) {
         troopsData.activeTroopCity = city;
@@ -861,7 +1017,6 @@ function renderTroopCityTabs() {
       }
     };
 
-    tab.appendChild(closeBtn);
     container.appendChild(tab);
   });
 }
@@ -871,15 +1026,12 @@ function renderTroopsContent() {
   container.innerHTML = '';
 
   const city = troopsData.activeTroopCity;
-  if (!city || !troopsData.selectedCities.includes(city)) {
+  if (!city || !cities.includes(city)) {
     container.innerHTML = `
       <div class="no-troops-msg">
-        <p>No hay ninguna ciudad seleccionada en Tropas.</p>
-        <button id="btn-add-first-troop-city" class="btn-action primary" style="max-width:180px;margin:10px auto;">+ Añadir Ciudad</button>
+        <p>No hay ciudades configuradas. Ve a la pestaña Configuración para añadir una.</p>
       </div>
     `;
-    const btn = document.getElementById('btn-add-first-troop-city');
-    if (btn) btn.onclick = openTroopCityModal;
     return;
   }
 
@@ -892,7 +1044,7 @@ function renderTroopsContent() {
   const unitsMap = troopsData.cities[city].units;
   const shipsMap = troopsData.cities[city].ships;
 
-  // Cálculo de totales combinados (Tropas + Barcos)
+  // Cálculo de totales combinados
   let totalMissingWood = 0;
   let totalMissingSulfur = 0;
   let totalMissingCrystal = 0;
@@ -917,7 +1069,7 @@ function renderTroopsContent() {
   calculateTotals(TROOP_DEFINITIONS.units, unitsMap);
   calculateTotals(TROOP_DEFINITIONS.ships, shipsMap);
 
-  // Tarjeta de resumen general de materiales
+  // Tarjeta de resumen general
   const summaryCard = document.createElement('div');
   summaryCard.className = 'troop-summary-card';
   const label = cityLabels[city];
@@ -954,7 +1106,7 @@ function renderTroopsContent() {
   `;
   container.appendChild(summaryCard);
 
-  // Función para renderizar una sección militar (Tropas o Barcos)
+  // Función para renderizar sección militar
   const renderMilitarySection = (title, categoryKey, list, map) => {
     const secHeader = document.createElement('div');
     secHeader.className = 'military-section-header';
@@ -970,7 +1122,6 @@ function renderTroopsContent() {
     secHeader.querySelector('.btn-sec-update').onclick = () => openUpdateTroopsModal(categoryKey);
     container.appendChild(secHeader);
 
-    // Filtrar existentes
     const visibleItems = list.filter(item => {
       const data = map[item.id];
       return data && ((data.actual && data.actual > 0) || (data.desired && data.desired > 0));
@@ -979,7 +1130,7 @@ function renderTroopsContent() {
     if (visibleItems.length === 0) {
       const emptyBox = document.createElement('div');
       emptyBox.className = 'no-troops-msg';
-      emptyBox.style.padding = '10px 5px';
+      emptyBox.style.padding = '8px 5px';
       emptyBox.innerHTML = `
         <span style="font-size:11px;">No hay registros en esta sección.</span>
         <button class="btn-action primary btn-mini" style="margin-left:6px;">+ Añadir</button>
@@ -1000,7 +1151,7 @@ function renderTroopsContent() {
       const card = document.createElement('div');
       card.className = 'troop-card';
 
-      // Columna 1: Imagen 2x más grande + Nombre
+      // Columna 1: Imagen 2x + Nombre
       const colIdentity = document.createElement('div');
       colIdentity.className = 'troop-col-identity';
       colIdentity.innerHTML = `
@@ -1027,6 +1178,7 @@ function renderTroopsContent() {
         itemData.actual = isNaN(val) ? 0 : Math.max(0, val);
         saveTroopsData();
         renderTroopsContent();
+        renderSummary();
       };
       rowReal.appendChild(inputReal);
 
@@ -1043,6 +1195,7 @@ function renderTroopsContent() {
         itemData.desired = isNaN(val) ? 0 : Math.max(0, val);
         saveTroopsData();
         renderTroopsContent();
+        renderSummary();
       };
       rowMeta.appendChild(inputMeta);
 
@@ -1102,12 +1255,11 @@ function renderTroopsContent() {
     container.appendChild(grid);
   };
 
-  // Renderizar ambas secciones en la misma vista
   renderMilitarySection("🛡️ Tropas Terrestres", "units", TROOP_DEFINITIONS.units, unitsMap);
   renderMilitarySection("⛵ Barcos de Guerra", "ships", TROOP_DEFINITIONS.ships, shipsMap);
 }
 
-// Modal: Añadir Tropas / Barcos (Catálogo completo de la categoría especificada)
+// Modal: Añadir Tropas / Barcos
 function openAddTroopsModal(categoryKey = "units") {
   const city = troopsData.activeTroopCity;
   if (!city) return;
@@ -1176,13 +1328,14 @@ function openAddTroopsModal(categoryKey = "units") {
 
     saveTroopsData();
     renderTroopsContent();
+    renderSummary();
     modal.classList.add('hidden');
   };
 
   modal.classList.remove('hidden');
 }
 
-// Modal: Actualizar Tropas / Barcos (Solo existentes para post-batalla)
+// Modal: Actualizar Tropas / Barcos
 function openUpdateTroopsModal(categoryKey = "units") {
   const city = troopsData.activeTroopCity;
   if (!city) return;
@@ -1244,165 +1397,101 @@ function openUpdateTroopsModal(categoryKey = "units") {
 
     saveTroopsData();
     renderTroopsContent();
+    renderSummary();
     modal.classList.add('hidden');
   };
 
   modal.classList.remove('hidden');
 }
 
-function openTroopCityModal() {
-  const modal = document.getElementById('troop-city-modal');
-  const listContainer = document.getElementById('available-troop-cities-list');
-  listContainer.innerHTML = '';
-
-  const activeCitiesList = cities.slice(0, activeCityCount);
-  activeCitiesList.forEach((city, idx) => {
-    const item = document.createElement('div');
-    item.className = 'city-rename-item';
-    item.style.cursor = 'pointer';
-
-    const label = cityLabels[city];
-    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
-    const fullName = (label && label.name) ? label.name : city;
-    const isAlreadyAdded = troopsData.selectedCities.includes(city);
-
-    item.innerHTML = `
-      <span class="city-rename-index">${idx + 1}</span>
-      <span style="flex-grow:1;font-weight:bold;font-size:11px;">${shortCode} - ${fullName}</span>
-      <span style="font-size:11px;font-weight:bold;color:${isAlreadyAdded ? '#2e7d32' : '#b14329'};">
-        ${isAlreadyAdded ? 'Añadida ✔️' : '+ Añadir'}
-      </span>
-    `;
-
-    item.onclick = () => {
-      if (!isAlreadyAdded) {
-        troopsData.selectedCities.push(city);
-        troopsData.activeTroopCity = city;
-        saveTroopsData();
-        renderTroopCityTabs();
-        renderTroopsContent();
-        modal.classList.add('hidden');
-      } else {
-        troopsData.activeTroopCity = city;
-        saveTroopsData();
-        renderTroopCityTabs();
-        renderTroopsContent();
-        modal.classList.add('hidden');
-      }
-    };
-
-    listContainer.appendChild(item);
-  });
-
+// Modal: Confirmar eliminación de ciudad
+function openDeleteConfirmModal(cityId, cityName) {
+  cityToDelete = cityId;
+  const modal = document.getElementById('modal-confirm-delete');
+  const text = document.getElementById('delete-confirm-text');
+  text.textContent = `¿Eliminar "${cityName}"?`;
   modal.classList.remove('hidden');
 }
 
-// Configurar navegación superior de 4 pestañas
-function setupNavigation() {
-  const navSummary = document.getElementById('nav-btn-summary');
-  const navConstruction = document.getElementById('nav-btn-construction');
-  const navTroops = document.getElementById('nav-btn-troops');
-  const navSettings = document.getElementById('nav-btn-settings');
-
-  const viewSummary = document.getElementById('view-summary');
-  const viewConstruction = document.getElementById('view-construction');
-  const viewTroops = document.getElementById('view-troops');
-  const viewSettings = document.getElementById('view-settings');
-  const btnEdit = document.getElementById('btn-edit');
-
-  const switchView = (targetView) => {
-    currentView = targetView;
-    [navSummary, navConstruction, navTroops, navSettings].forEach(b => b.classList.remove('active'));
-    [viewSummary, viewConstruction, viewTroops, viewSettings].forEach(v => v.classList.add('hidden'));
-
-    btnEdit.style.display = (targetView === 'construction') ? 'flex' : 'none';
-
-    if (targetView === 'summary') {
-      navSummary.classList.add('active');
-      viewSummary.classList.remove('hidden');
-      renderSummary();
-    } else if (targetView === 'construction') {
-      navConstruction.classList.add('active');
-      viewConstruction.classList.remove('hidden');
-      renderTabs();
-      renderMetaSummary();
-      renderContent();
-    } else if (targetView === 'troops') {
-      navTroops.classList.add('active');
-      viewTroops.classList.remove('hidden');
-      renderTroopCityTabs();
-      renderTroopsContent();
-    } else if (targetView === 'settings') {
-      navSettings.classList.add('active');
-      viewSettings.classList.remove('hidden');
-      document.getElementById('input-city-count').value = activeCityCount;
-      populateCityRenameList();
-    }
-  };
-
-  navSummary.onclick = () => switchView('summary');
-  navConstruction.onclick = () => switchView('construction');
-  navTroops.onclick = () => switchView('troops');
-  navSettings.onclick = () => switchView('settings');
-
-  // Modales
-  document.getElementById('btn-add-troop-city').onclick = openTroopCityModal;
-  document.getElementById('btn-close-troop-city-modal').onclick = () => {
-    document.getElementById('troop-city-modal').classList.add('hidden');
-  };
-  document.getElementById('btn-close-add-troops-modal').onclick = () => {
-    document.getElementById('modal-add-troops').classList.add('hidden');
-  };
-  document.getElementById('btn-close-update-troops-modal').onclick = () => {
-    document.getElementById('modal-update-troops').classList.add('hidden');
-  };
-}
-
-// Configuración y gestión de nombres de ciudades
+// ========================================================
+// VISTA: CONFIGURACIÓN (GESTIÓN Y ARRASTRE DE CIUDADES)
+// ========================================================
 function populateCityRenameList() {
   const container = document.getElementById('city-rename-list');
   container.innerHTML = '';
-  
-  cities.slice(0, activeCityCount).forEach((city, idx) => {
+
+  let draggedCityIndex = null;
+
+  cities.forEach((city, idx) => {
     const item = document.createElement('div');
     item.className = 'city-rename-item';
-    
-    const indexSpan = document.createElement('span');
-    indexSpan.className = 'city-rename-index';
-    indexSpan.textContent = idx + 1;
-    indexSpan.title = city;
-    
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'city-rename-input name-input';
-    nameInput.maxLength = 30;
-    nameInput.placeholder = 'Nombre...';
-    const existingLabel = cityLabels[city];
-    nameInput.value = (existingLabel && existingLabel.name) ? existingLabel.name : '';
-    
-    const abbrInput = document.createElement('input');
-    abbrInput.type = 'text';
-    abbrInput.className = 'city-rename-input abbr-input';
-    abbrInput.maxLength = 6;
-    abbrInput.placeholder = 'Abrev.';
-    abbrInput.value = (existingLabel && existingLabel.abbr) ? existingLabel.abbr : '';
-    
-    const saveLabel = () => {
-      const nameVal = nameInput.value.trim();
-      const abbrVal = abbrInput.value.trim();
-      if (nameVal || abbrVal) {
-        cityLabels[city] = { name: nameVal, abbr: abbrVal };
+    item.draggable = true;
+    item.dataset.index = idx;
+
+    const label = cityLabels[city] || {};
+    const existingName = label.name || '';
+    const existingAbbr = label.abbr || '';
+
+    item.innerHTML = `
+      <span class="city-drag-handle" title="Arrastra para reordenar">☰</span>
+      <span class="city-rename-index">${idx + 1}</span>
+      <input type="text" class="city-rename-input name-input" placeholder="Nombre..." maxlength="30" value="${existingName}">
+      <input type="text" class="city-rename-input abbr-input" placeholder="Abrev" maxlength="6" value="${existingAbbr}">
+      <button class="city-delete-btn" title="Eliminar ciudad">🗑️</button>
+    `;
+
+    const nameInput = item.querySelector('.name-input');
+    const abbrInput = item.querySelector('.abbr-input');
+
+    const updateLabel = () => {
+      const nVal = nameInput.value.trim();
+      const aVal = abbrInput.value.trim();
+      if (nVal || aVal) {
+        cityLabels[city] = { name: nVal, abbr: aVal };
       } else {
         delete cityLabels[city];
       }
     };
-    
-    nameInput.addEventListener('input', saveLabel);
-    abbrInput.addEventListener('input', saveLabel);
-    
-    item.appendChild(indexSpan);
-    item.appendChild(nameInput);
-    item.appendChild(abbrInput);
+    nameInput.addEventListener('input', updateLabel);
+    abbrInput.addEventListener('input', updateLabel);
+
+    item.querySelector('.city-delete-btn').onclick = () => {
+      openDeleteConfirmModal(city, existingName || city);
+    };
+
+    // Drag and drop para reordenar ciudades
+    item.addEventListener('dragstart', (e) => {
+      draggedCityIndex = idx;
+      item.classList.add('is-dragging');
+      e.dataTransfer.setData('text/plain', idx);
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetIndex = idx;
+      if (draggedCityIndex !== null && draggedCityIndex !== targetIndex) {
+        const movedCity = cities.splice(draggedCityIndex, 1)[0];
+        cities.splice(targetIndex, 0, movedCity);
+        saveCitiesList();
+        saveData();
+        populateCityRenameList();
+        renderTabs();
+        renderMetaSummary();
+        renderContent();
+        renderTroopCityTabs();
+        renderTroopsContent();
+        renderSummary();
+      }
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('is-dragging');
+    });
+
     container.appendChild(item);
   });
 }
@@ -1413,33 +1502,89 @@ function setupSettingsHandlers() {
   const txtBackup = document.getElementById('txt-backup');
   const backupStatus = document.getElementById('backup-status');
 
-  document.getElementById('btn-apply-city-count').onclick = () => {
-    const input = document.getElementById('input-city-count');
-    const val = parseInt(input.value, 10);
-    if (!isNaN(val) && val >= 1 && val <= cities.length) {
-      activeCityCount = val;
-      chrome.storage.local.set({ ikariamCityCount: val });
-      populateCityRenameList();
-      renderTabs();
-      renderMetaSummary();
-      renderContent();
-      renderTroopCityTabs();
-    }
+  // Añadir nueva ciudad
+  document.getElementById('btn-add-new-city').onclick = () => {
+    const newNum = cities.length + 1;
+    const newCityId = "city_" + Date.now();
+    cities.push(newCityId);
+
+    appData[newCityId] = {};
+    buildingsConfig.forEach(b => {
+      appData[newCityId][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+    });
+
+    cityLabels[newCityId] = {
+      name: "Ciudad " + newNum,
+      abbr: "C" + newNum
+    };
+
+    saveCitiesList();
+    saveCityLabels();
+    saveData();
+
+    populateCityRenameList();
+    renderTabs();
+    renderMetaSummary();
+    renderContent();
+    renderTroopCityTabs();
+    renderTroopsContent();
+    renderSummary();
   };
 
+  // Guardar nombres explícitamente
   document.getElementById('btn-save-cities').onclick = () => {
     saveCityLabels();
     renderContent();
     renderTroopCityTabs();
     renderTroopsContent();
-    showBackupStatus("¡Nombres de ciudades guardados!", true);
+    renderSummary();
+    showBackupStatus("¡Ciudades guardadas con éxito!", true);
+  };
+
+  // Modal eliminar ciudad
+  document.getElementById('btn-confirm-delete').onclick = () => {
+    if (cityToDelete) {
+      cities = cities.filter(c => c !== cityToDelete);
+      delete appData[cityToDelete];
+      delete cityLabels[cityToDelete];
+      if (troopsData.cities) delete troopsData.cities[cityToDelete];
+      if (troopsData.activeTroopCity === cityToDelete) {
+        troopsData.activeTroopCity = cities[0] || null;
+      }
+      saveCitiesList();
+      saveCityLabels();
+      saveData();
+      saveTroopsData();
+
+      populateCityRenameList();
+      renderTabs();
+      renderMetaSummary();
+      renderContent();
+      renderTroopCityTabs();
+      renderTroopsContent();
+      renderSummary();
+
+      cityToDelete = null;
+      document.getElementById('modal-confirm-delete').classList.add('hidden');
+    }
+  };
+
+  document.getElementById('btn-cancel-delete').onclick = () => {
+    cityToDelete = null;
+    document.getElementById('modal-confirm-delete').classList.add('hidden');
+  };
+  document.getElementById('btn-close-delete-modal').onclick = () => {
+    cityToDelete = null;
+    document.getElementById('modal-confirm-delete').classList.add('hidden');
   };
   
+  // Backup Export/Import
   btnExport.onclick = () => {
     const dataToExport = {
       ikariamLevels: appData,
       ikariamBuildings: buildingsConfig,
       ikariamCityLabels: cityLabels,
+      ikariamCitiesList: cities,
       ikariamTroops: troopsData
     };
     const jsonStr = JSON.stringify(dataToExport, null, 2);
@@ -1480,12 +1625,16 @@ function setupSettingsHandlers() {
       if (parsed.ikariamBuildings) {
         buildingsConfig = parsed.ikariamBuildings;
       }
+      if (parsed.ikariamCitiesList && Array.isArray(parsed.ikariamCitiesList)) {
+        cities = parsed.ikariamCitiesList;
+      }
       cityLabels = parsed.ikariamCityLabels || {};
       if (parsed.ikariamTroops) {
         troopsData = parsed.ikariamTroops;
       }
       
       saveData();
+      saveCitiesList();
       saveCityLabels();
       saveTroopsData();
       
@@ -1495,6 +1644,8 @@ function setupSettingsHandlers() {
         renderContent();
         renderTroopCityTabs();
         renderTroopsContent();
+        renderSummary();
+        populateCityRenameList();
         showBackupStatus("¡Datos importados con éxito!", true);
       });
       
@@ -1509,6 +1660,62 @@ function setupSettingsHandlers() {
   }
 }
 
+// Configurar navegación superior de 4 pestañas
+function setupNavigation() {
+  const navSummary = document.getElementById('nav-btn-summary');
+  const navConstruction = document.getElementById('nav-btn-construction');
+  const navTroops = document.getElementById('nav-btn-troops');
+  const navSettings = document.getElementById('nav-btn-settings');
+
+  const viewSummary = document.getElementById('view-summary');
+  const viewConstruction = document.getElementById('view-construction');
+  const viewTroops = document.getElementById('view-troops');
+  const viewSettings = document.getElementById('view-settings');
+  const btnEdit = document.getElementById('btn-edit');
+
+  const switchView = (targetView) => {
+    currentView = targetView;
+    [navSummary, navConstruction, navTroops, navSettings].forEach(b => b.classList.remove('active'));
+    [viewSummary, viewConstruction, viewTroops, viewSettings].forEach(v => v.classList.add('hidden'));
+
+    btnEdit.style.display = (targetView === 'construction') ? 'flex' : 'none';
+
+    if (targetView === 'summary') {
+      navSummary.classList.add('active');
+      viewSummary.classList.remove('hidden');
+      renderSummary();
+    } else if (targetView === 'construction') {
+      navConstruction.classList.add('active');
+      viewConstruction.classList.remove('hidden');
+      renderTabs();
+      renderMetaSummary();
+      renderContent();
+    } else if (targetView === 'troops') {
+      navTroops.classList.add('active');
+      viewTroops.classList.remove('hidden');
+      renderTroopCityTabs();
+      renderTroopsContent();
+    } else if (targetView === 'settings') {
+      navSettings.classList.add('active');
+      viewSettings.classList.remove('hidden');
+      populateCityRenameList();
+    }
+  };
+
+  navSummary.onclick = () => switchView('summary');
+  navConstruction.onclick = () => switchView('construction');
+  navTroops.onclick = () => switchView('troops');
+  navSettings.onclick = () => switchView('settings');
+
+  // Modales
+  document.getElementById('btn-close-add-troops-modal').onclick = () => {
+    document.getElementById('modal-add-troops').classList.add('hidden');
+  };
+  document.getElementById('btn-close-update-troops-modal').onclick = () => {
+    document.getElementById('modal-update-troops').classList.add('hidden');
+  };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const tabsContainer = document.getElementById('tabs');
   if (tabsContainer) {
@@ -1521,6 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData(() => {
     setupNavigation();
     setupEditButton();
+    setupReorderBuildingsButton();
     setupSettingsHandlers();
     renderTabs();
     renderMetaSummary();

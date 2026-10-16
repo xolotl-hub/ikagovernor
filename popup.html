@@ -14,18 +14,27 @@
     <button id="nav-btn-settings" class="nav-btn">⚙️ Configuración</button>
   </div>
 
-  <!-- Vista: Resumen de Construcción -->
+  <!-- Vista: Resumen de Construcción y Tropas -->
   <div id="view-summary" class="view-panel hidden">
     <div class="summary-header">
       <h2>Próximas 6 Construcciones</h2>
       <p class="section-desc">Prioridad por orden de edificios y metas activas (excluye Intendencia).</p>
     </div>
     <div id="summary-cards-container" class="summary-cards-list"></div>
+
+    <div class="summary-header" style="margin-top: 14px; border-top: 2px solid #c2b58b;">
+      <h2>Top 6 Ciudades con Más Tropas Faltantes</h2>
+      <p class="section-desc">Ciudades con mayor déficit respecto a sus objetivos militares.</p>
+    </div>
+    <div id="summary-troops-container" class="summary-cards-list"></div>
   </div>
 
   <!-- Vista: Construcción -->
   <div id="view-construction" class="view-panel active">
-    <div class="tabs-container" id="tabs"></div>
+    <div class="tabs-wrapper">
+      <div class="tabs-container" id="tabs"></div>
+      <button id="btn-reorder-buildings" class="btn-reorder-tabs" title="Reordenar pestañas de edificios">↔️</button>
+    </div>
     <div class="building-meta-summary" id="meta-summary"></div>
     <div class="content" id="content"></div>
   </div>
@@ -34,9 +43,6 @@
   <div id="view-troops" class="view-panel hidden">
     <div class="troops-top-bar">
       <span class="troops-top-title">⚔️ Guarnición de la Ciudad</span>
-      <div class="troops-actions-bar">
-        <button id="btn-add-troop-city" class="btn-action primary" title="Añadir ciudad a la vista militar">+ Ciudad</button>
-      </div>
     </div>
     
     <!-- Pestañas horizontales de ciudades en tropas -->
@@ -61,36 +67,13 @@
         <div id="backup-status" class="status-msg"></div>
       </div>
       
-      <!-- Número de Ciudades -->
+      <!-- Nombres y Orden de Ciudades -->
       <div class="settings-section">
-        <h3>Número de Ciudades</h3>
-        <p class="section-desc">Cuántas ciudades tienes activas (máx 13). Las demás se ocultan.</p>
-        <div class="city-count-row">
-          <input id="input-city-count" type="number" min="1" max="13" value="13" class="city-count-input">
-          <button id="btn-apply-city-count" class="btn-action primary">Aplicar</button>
-        </div>
-      </div>
-      
-      <!-- Nombres de Ciudades -->
-      <div class="settings-section">
-        <h3>Nombres de Ciudades</h3>
-        <p class="section-desc">Personaliza el nombre completo y la abreviatura (máx 6 chars) que se muestra en las filas.</p>
+        <h3>Gestión y Orden de Ciudades</h3>
+        <p class="section-desc">Arrastra las filas para reordenar las ciudades. El total se actualiza automáticamente.</p>
         <div id="city-rename-list" class="city-rename-list"></div>
-        <button id="btn-save-cities" class="btn-action primary" style="margin-top:8px;width:100%;">Guardar Nombres</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal para seleccionar y añadir ciudad a tropas -->
-  <div id="troop-city-modal" class="overlay hidden">
-    <div class="overlay-content" style="max-height: 60%;">
-      <div class="overlay-header">
-        <h2>Añadir Ciudad a Tropas</h2>
-        <button id="btn-close-troop-city-modal" class="close-btn">&times;</button>
-      </div>
-      <div class="overlay-body">
-        <p class="section-desc">Selecciona una ciudad para seguir sus tropas:</p>
-        <div id="available-troop-cities-list" class="city-rename-list"></div>
+        <button id="btn-add-new-city" class="btn-action" style="margin-top:6px;width:100%;">+ Añadir Ciudad</button>
+        <button id="btn-save-cities" class="btn-action primary" style="margin-top:6px;width:100%;">Guardar Ciudades</button>
       </div>
     </div>
   </div>
@@ -121,6 +104,24 @@
         <p class="section-desc">Ajusta las cantidades reales de las tropas presentes en la ciudad:</p>
         <div id="update-troops-active-list" class="troop-modal-list"></div>
         <button id="btn-save-update-troops" class="btn-action primary" style="margin-top:10px;width:100%;">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmación para eliminar ciudad -->
+  <div id="modal-confirm-delete" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 40%; text-align: center;">
+      <div class="overlay-header">
+        <h2>Confirmar Eliminación</h2>
+        <button id="btn-close-delete-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <p id="delete-confirm-text" style="font-size:12px;margin:15px 0;font-weight:600;color:#4a3b2c;"></p>
+        <p style="font-size:10px;color:#c62828;margin-bottom:15px;">Esta acción borrará los niveles y datos de tropas de esta ciudad.</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="btn-cancel-delete" class="btn-action">Cancelar</button>
+          <button id="btn-confirm-delete" class="btn-action primary" style="background:#c62828;border-color:#b71c1c;">Eliminar</button>
+        </div>
       </div>
     </div>
   </div>
