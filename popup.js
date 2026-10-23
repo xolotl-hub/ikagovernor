@@ -511,13 +511,26 @@ function setupAccountModals() {
 }
 
 function initAccounts() {
-  chrome.storage.local.get(['ikariamAccounts', 'ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'], (result) => {
-    if (result.ikariamAccounts && Array.isArray(result.ikariamAccounts)) {
+  chrome.storage.local.get(null, (result) => {
+    // 1. Si ya existen cuentas guardadas
+    if (result && result.ikariamAccounts && Array.isArray(result.ikariamAccounts) && result.ikariamAccounts.length > 0) {
       accounts = result.ikariamAccounts;
-    } else if (result.ikariamLevels || result.ikariamCitiesList) {
+      renderAccountsList();
+      return;
+    }
+
+    // 2. Si no hay cuentas o ikariamAccounts estaba vacío, comprobar si hay datos previos para migrarlos a Cuenta 1
+    const hasLegacy = result && (
+      (result.ikariamLevels && Object.keys(result.ikariamLevels).length > 0) ||
+      (result.ikariamCitiesList && result.ikariamCitiesList.length > 0) ||
+      (result.ikariamBuildings && result.ikariamBuildings.length > 0) ||
+      (result.ikariamTroops && (result.ikariamTroops.activeTroopCity || (result.ikariamTroops.cities && Object.keys(result.ikariamTroops.cities).length > 0)))
+    );
+
+    if (hasLegacy) {
       const defaultAcc = {
-        id: "acc_" + Date.now(),
-        name: "Principal",
+        id: "acc_1",
+        name: "Cuenta 1",
         world: "",
         createdAt: Date.now()
       };
@@ -532,12 +545,13 @@ function initAccounts() {
       chrome.storage.local.set({
         ikariamAccounts: accounts,
         ['ikariam_acc_data_' + defaultAcc.id]: legacyBundle
+      }, () => {
+        renderAccountsList();
       });
     } else {
       accounts = [];
+      renderAccountsList();
     }
-
-    renderAccountsList();
   });
 }
 
