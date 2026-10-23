@@ -6,7 +6,7 @@
   "permissions": ["storage", "sidePanel"],
   "browser_specific_settings": {
     "gecko": {
-      "id": "ika-governor@local",
+      "id": "ikariam-planner@local",
       "strict_min_version": "109.0"
     }
   },
