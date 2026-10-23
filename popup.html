@@ -6,13 +6,40 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <!-- Navegación Principal Global -->
-  <div class="main-nav">
-    <button id="nav-btn-summary" class="nav-btn">📋 Resumen</button>
-    <button id="nav-btn-construction" class="nav-btn active">🏛️ Construcción</button>
-    <button id="nav-btn-troops" class="nav-btn">⚔️ Tropas</button>
-    <button id="nav-btn-settings" class="nav-btn">⚙️ Configuración</button>
+  <!-- Vista: Selector de Cuentas / Login -->
+  <div id="view-accounts" class="accounts-view-panel">
+    <div class="accounts-header">
+      <div class="accounts-logo">🏛️</div>
+      <h1 class="accounts-title">Ika Governor</h1>
+      <p class="accounts-subtitle">Selecciona una cuenta para continuar</p>
+    </div>
+
+    <div class="accounts-actions-bar">
+      <button id="btn-open-add-account" class="btn-action primary" style="width: 100%; font-size: 13px; padding: 9px;">+ Agregar Cuenta</button>
+    </div>
+
+    <div id="accounts-list" class="accounts-list"></div>
   </div>
+
+  <!-- Contenedor Principal de la Aplicación (Oculto hasta seleccionar cuenta) -->
+  <div id="app-main-container" class="hidden">
+    <!-- Barra superior de sesión de cuenta activa -->
+    <div class="session-top-bar">
+      <div class="session-user-info">
+        <span class="session-user-avatar">👤</span>
+        <span class="session-user-name" id="session-user-display">Cuenta</span>
+        <span class="session-world-badge hidden" id="session-world-display"></span>
+      </div>
+      <button id="btn-switch-account" class="btn-switch-account" title="Cambiar de cuenta">🔄 Cambiar cuenta</button>
+    </div>
+
+    <!-- Navegación Principal Global -->
+    <div class="main-nav">
+      <button id="nav-btn-summary" class="nav-btn">📋 Resumen</button>
+      <button id="nav-btn-construction" class="nav-btn active">🏛️ Construcción</button>
+      <button id="nav-btn-troops" class="nav-btn">⚔️ Tropas</button>
+      <button id="nav-btn-settings" class="nav-btn">⚙️ Configuración</button>
+    </div>
 
   <!-- Vista: Resumen de Construcción y Tropas -->
   <div id="view-summary" class="view-panel hidden">
@@ -157,8 +184,52 @@
     </div>
   </div>
   
+  <!-- Modal: Agregar Cuenta -->
+  <div id="modal-add-account" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 70%; width: 90%;">
+      <div class="overlay-header">
+        <h2>Agregar Cuenta</h2>
+        <button id="btn-close-add-account" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size:11px; font-weight:bold; color:#7b7050; margin-bottom:4px;">Nombre de Usuario *</label>
+          <input type="text" id="input-account-name" class="account-input" placeholder="Ej: Aquiles" maxlength="30" autocomplete="off">
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display:block; font-size:11px; font-weight:bold; color:#7b7050; margin-bottom:4px;">Mundo / Servidor (Opcional)</label>
+          <input type="text" id="input-account-world" class="account-input" placeholder="Ej: Ares, Alpha..." maxlength="30" autocomplete="off">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-cancel-add-account" class="btn-action" style="flex:1;">Cancelar</button>
+          <button id="btn-confirm-add-account" class="btn-action primary" style="flex:1;">Crear Cuenta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar Eliminación de Cuenta -->
+  <div id="modal-confirm-delete-account" class="overlay hidden">
+    <div class="overlay-content" style="max-height: 45%; text-align: center; width: 88%;">
+      <div class="overlay-header">
+        <h2>Eliminar Cuenta</h2>
+        <button id="btn-close-delete-account-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="overlay-body">
+        <p id="delete-account-confirm-text" style="font-size:12px;margin:15px 0;font-weight:600;color:#4a3b2c;"></p>
+        <p style="font-size:10px;color:#c62828;margin-bottom:15px;">Esta acción borrará de forma permanente los edificios, niveles y tropas de esta cuenta.</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="btn-cancel-delete-account" class="btn-action">Cancelar</button>
+          <button id="btn-confirm-delete-account" class="btn-action primary" style="background:#c62828;border-color:#b71c1c;">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Botón flotante de edición (solo activo en Construcción) -->
-  <button id="btn-edit" class="floating-btn edit-mode-off" title="Editar niveles y checkpoints">✏️</button>
+  <button id="btn-edit" class="floating-btn edit-mode-off hidden" title="Editar niveles y checkpoints">✏️</button>
+  
+  </div> <!-- Fin #app-main-container -->
   
   <script src="popup.js"></script>
 </body>

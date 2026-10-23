@@ -80,6 +80,10 @@ const TROOP_DEFINITIONS = {
   ]
 };
 
+let accounts = [];
+let currentAccount = null;
+let accountToDelete = null;
+
 let buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
 let appData = {};
 let cityLabels = {};
@@ -156,69 +160,91 @@ function getInitialData() {
   return data;
 }
 
-function loadData(callback) {
-  chrome.storage.local.get(['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamCityCount', 'ikariamTroops'], (result) => {
+function saveCurrentAccountBundle() {
+  if (!currentAccount) return;
+  const bundle = {
+    levels: appData,
+    buildings: buildingsConfig,
+    cities: cities,
+    cityLabels: cityLabels,
+    troops: troopsData
+  };
+  chrome.storage.local.set({
+    ['ikariam_acc_data_' + currentAccount.id]: bundle
+  });
+}
+
+function saveData() {
+  saveCurrentAccountBundle();
+}
+
+function saveCitiesList() {
+  saveCurrentAccountBundle();
+}
+
+function saveTroopsData() {
+  saveCurrentAccountBundle();
+}
+
+function saveCityLabels() {
+  saveCurrentAccountBundle();
+}
+
+function loadAccountData(accId, callback) {
+  const dataKey = 'ikariam_acc_data_' + accId;
+  chrome.storage.local.get([dataKey], (res) => {
+    const bundle = res[dataKey] || {};
     let updated = false;
 
-    // Cargar lista de ciudades
-    if (result.ikariamCitiesList && Array.isArray(result.ikariamCitiesList) && result.ikariamCitiesList.length > 0) {
-      cities = result.ikariamCitiesList;
-    } else if (result.ikariamCityCount && result.ikariamCityCount >= 1) {
-      cities = DEFAULT_CITIES.slice(0, result.ikariamCityCount);
-      saveCitiesList();
+    // 1. Ciudades
+    if (bundle.cities && Array.isArray(bundle.cities) && bundle.cities.length > 0) {
+      cities = bundle.cities;
     } else {
       cities = [...DEFAULT_CITIES];
-      saveCitiesList();
+      updated = true;
     }
 
-    if (result.ikariamCityLabels) {
-      cityLabels = result.ikariamCityLabels;
-    } else {
-      cityLabels = {};
-    }
+    // 2. City Labels
+    cityLabels = bundle.cityLabels || {};
 
-    if (result.ikariamBuildings) {
+    // 3. Edificios
+    if (bundle.buildings && Array.isArray(bundle.buildings) && bundle.buildings.length > 0) {
       const loadedBuildings = [];
-      result.ikariamBuildings.forEach(b => {
-        if (b.name) {
-          b.name = b.name.normalize('NFC');
-        }
+      bundle.buildings.forEach(b => {
+        if (b.name) b.name = b.name.normalize('NFC');
         loadedBuildings.push(b);
       });
 
-      // Sincronizar conservando el orden guardado por el usuario
       const syncedBuildings = [];
       loadedBuildings.forEach(b => {
         const defB = DEFAULT_BUILDINGS.find(d => d.name === b.name);
-        if (defB) {
-          syncedBuildings.push({ ...defB, ...b });
-        }
+        if (defB) syncedBuildings.push({ ...defB, ...b });
       });
 
-      // Añadir edificios por defecto que falten
       DEFAULT_BUILDINGS.forEach(defB => {
         if (!syncedBuildings.some(b => b.name === defB.name)) {
           syncedBuildings.push({ ...defB });
           updated = true;
         }
       });
-
       buildingsConfig = syncedBuildings;
     } else {
       buildingsConfig = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+      updated = true;
     }
-    
+
     currentBuilding = buildingsConfig[0];
-    
-    if (result.ikariamLevels) {
-      appData = result.ikariamLevels;
+
+    // 4. Niveles
+    if (bundle.levels) {
+      appData = bundle.levels;
       cities.forEach(city => {
         if (!appData[city]) {
           appData[city] = {};
           updated = true;
         }
 
-        // Migración a Depósito: [d1, d2]
+        // Migración Depósito
         if (appData[city]["Deposito 1"] !== undefined || appData[city]["Deposito 2"] !== undefined) {
           const d1 = appData[city]["Deposito 1"] || 0;
           const d2 = appData[city]["Deposito 2"] || 0;
@@ -240,15 +266,14 @@ function loadData(callback) {
           }
         });
       });
-      if (updated) saveData();
     } else {
       appData = getInitialData();
-      saveData();
+      updated = true;
     }
 
-    // Cargar tropas
-    if (result.ikariamTroops) {
-      troopsData = result.ikariamTroops;
+    // 5. Tropas
+    if (bundle.troops) {
+      troopsData = bundle.troops;
       if (!troopsData.cities) troopsData.cities = {};
       if (!troopsData.activeTroopCity || !cities.includes(troopsData.activeTroopCity)) {
         troopsData.activeTroopCity = cities[0] || null;
@@ -258,31 +283,262 @@ function loadData(callback) {
         activeTroopCity: cities[0] || null,
         cities: {}
       };
-      saveTroopsData();
+      updated = true;
     }
 
+    if (updated) {
+      saveCurrentAccountBundle();
+    }
+
+    if (callback) callback();
+  });
+}
+
+function loadData(callback) {
+  if (currentAccount) {
+    loadAccountData(currentAccount.id, callback);
+  } else if (callback) {
     callback();
+  }
+}
+
+function renderAccountsList() {
+  const container = document.getElementById('accounts-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!accounts || accounts.length === 0) {
+    container.innerHTML = `
+      <div class="accounts-empty-state">
+        <p>No tienes cuentas registradas.</p>
+        <p style="margin-top: 6px; font-size: 11px;">Haz clic en <strong>"+ Agregar Cuenta"</strong> para comenzar a planificar tus ciudades.</p>
+      </div>
+    `;
+    return;
+  }
+
+  accounts.forEach(acc => {
+    const card = document.createElement('div');
+    card.className = 'account-card';
+    card.title = `Abrir cuenta: ${acc.name}`;
+
+    const left = document.createElement('div');
+    left.className = 'account-card-left';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'account-avatar';
+    avatar.textContent = '🏛️';
+
+    const info = document.createElement('div');
+    info.className = 'account-info';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'account-name';
+    nameEl.textContent = acc.name;
+    info.appendChild(nameEl);
+
+    if (acc.world && acc.world.trim()) {
+      const worldEl = document.createElement('span');
+      worldEl.className = 'account-world-tag';
+      worldEl.textContent = '🌍 ' + acc.world.trim();
+      info.appendChild(worldEl);
+    }
+
+    left.appendChild(avatar);
+    left.appendChild(info);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-delete-account';
+    delBtn.textContent = '🗑️';
+    delBtn.title = 'Eliminar cuenta';
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      accountToDelete = acc;
+      document.getElementById('delete-account-confirm-text').textContent = `¿Seguro que deseas eliminar la cuenta "${acc.name}"?`;
+      document.getElementById('modal-confirm-delete-account').classList.remove('hidden');
+    };
+
+    card.appendChild(left);
+    card.appendChild(delBtn);
+
+    card.onclick = () => {
+      selectAccount(acc);
+    };
+
+    container.appendChild(card);
   });
 }
 
-function saveData() {
-  chrome.storage.local.set({ 
-    ikariamLevels: appData,
-    ikariamBuildings: buildingsConfig,
-    ikariamCitiesList: cities
+function selectAccount(account) {
+  currentAccount = account;
+  document.getElementById('session-user-display').textContent = account.name;
+  const worldBadge = document.getElementById('session-world-display');
+  if (account.world && account.world.trim()) {
+    worldBadge.textContent = '🌍 ' + account.world.trim();
+    worldBadge.classList.remove('hidden');
+  } else {
+    worldBadge.textContent = '';
+    worldBadge.classList.add('hidden');
+  }
+
+  document.getElementById('view-accounts').classList.add('hidden');
+  document.getElementById('app-main-container').classList.remove('hidden');
+
+  loadAccountData(account.id, () => {
+    switchView('construction');
+    renderTabs();
+    renderMetaSummary();
+    renderContent();
+    renderTroopCityTabs();
+    renderTroopsContent();
+    renderSummary();
+    populateCityRenameList();
   });
 }
 
-function saveCitiesList() {
-  chrome.storage.local.set({ ikariamCitiesList: cities });
+function setupAccountModals() {
+  const modalAdd = document.getElementById('modal-add-account');
+  const btnOpenAdd = document.getElementById('btn-open-add-account');
+  const btnCloseAdd = document.getElementById('btn-close-add-account');
+  const btnCancelAdd = document.getElementById('btn-cancel-add-account');
+  const btnConfirmAdd = document.getElementById('btn-confirm-add-account');
+  const inputName = document.getElementById('input-account-name');
+  const inputWorld = document.getElementById('input-account-world');
+
+  const modalDelete = document.getElementById('modal-confirm-delete-account');
+  const btnCloseDel = document.getElementById('btn-close-delete-account-modal');
+  const btnCancelDel = document.getElementById('btn-cancel-delete-account');
+  const btnConfirmDel = document.getElementById('btn-confirm-delete-account');
+
+  const btnSwitch = document.getElementById('btn-switch-account');
+
+  if (btnOpenAdd) {
+    btnOpenAdd.onclick = () => {
+      inputName.value = '';
+      inputWorld.value = '';
+      modalAdd.classList.remove('hidden');
+      inputName.focus();
+    };
+  }
+
+  const closeAddModal = () => {
+    if (modalAdd) modalAdd.classList.add('hidden');
+  };
+  if (btnCloseAdd) btnCloseAdd.onclick = closeAddModal;
+  if (btnCancelAdd) btnCancelAdd.onclick = closeAddModal;
+
+  if (btnConfirmAdd) {
+    btnConfirmAdd.onclick = () => {
+      const nameVal = inputName.value.trim();
+      const worldVal = inputWorld.value.trim();
+
+      if (!nameVal) {
+        inputName.focus();
+        inputName.style.borderColor = '#c62828';
+        setTimeout(() => { inputName.style.borderColor = '#c2b58b'; }, 1500);
+        return;
+      }
+
+      const newAcc = {
+        id: "acc_" + Date.now(),
+        name: nameVal,
+        world: worldVal,
+        createdAt: Date.now()
+      };
+
+      accounts.push(newAcc);
+      const freshBundle = {
+        levels: null,
+        buildings: null,
+        cities: null,
+        cityLabels: {},
+        troops: null
+      };
+
+      chrome.storage.local.set({
+        ikariamAccounts: accounts,
+        ['ikariam_acc_data_' + newAcc.id]: freshBundle
+      }, () => {
+        closeAddModal();
+        renderAccountsList();
+      });
+    };
+  }
+
+  if (inputName) {
+    inputName.onkeydown = (e) => {
+      if (e.key === 'Enter') btnConfirmAdd.click();
+    };
+  }
+  if (inputWorld) {
+    inputWorld.onkeydown = (e) => {
+      if (e.key === 'Enter') btnConfirmAdd.click();
+    };
+  }
+
+  const closeDeleteModal = () => {
+    accountToDelete = null;
+    if (modalDelete) modalDelete.classList.add('hidden');
+  };
+  if (btnCloseDel) btnCloseDel.onclick = closeDeleteModal;
+  if (btnCancelDel) btnCancelDel.onclick = closeDeleteModal;
+
+  if (btnConfirmDel) {
+    btnConfirmDel.onclick = () => {
+      if (!accountToDelete) return;
+      const accId = accountToDelete.id;
+      accounts = accounts.filter(a => a.id !== accId);
+
+      chrome.storage.local.remove('ikariam_acc_data_' + accId, () => {
+        chrome.storage.local.set({ ikariamAccounts: accounts }, () => {
+          closeDeleteModal();
+          renderAccountsList();
+        });
+      });
+    };
+  }
+
+  if (btnSwitch) {
+    btnSwitch.onclick = () => {
+      saveCurrentAccountBundle();
+      currentAccount = null;
+      document.getElementById('app-main-container').classList.add('hidden');
+      document.getElementById('btn-edit').classList.add('hidden');
+      document.getElementById('view-accounts').classList.remove('hidden');
+      renderAccountsList();
+    };
+  }
 }
 
-function saveTroopsData() {
-  chrome.storage.local.set({ ikariamTroops: troopsData });
-}
+function initAccounts() {
+  chrome.storage.local.get(['ikariamAccounts', 'ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'], (result) => {
+    if (result.ikariamAccounts && Array.isArray(result.ikariamAccounts)) {
+      accounts = result.ikariamAccounts;
+    } else if (result.ikariamLevels || result.ikariamCitiesList) {
+      const defaultAcc = {
+        id: "acc_" + Date.now(),
+        name: "Principal",
+        world: "",
+        createdAt: Date.now()
+      };
+      accounts = [defaultAcc];
+      const legacyBundle = {
+        levels: result.ikariamLevels || null,
+        buildings: result.ikariamBuildings || null,
+        cities: result.ikariamCitiesList || null,
+        cityLabels: result.ikariamCityLabels || null,
+        troops: result.ikariamTroops || null
+      };
+      chrome.storage.local.set({
+        ikariamAccounts: accounts,
+        ['ikariam_acc_data_' + defaultAcc.id]: legacyBundle
+      });
+    } else {
+      accounts = [];
+    }
 
-function saveCityLabels() {
-  chrome.storage.local.set({ ikariamCityLabels: cityLabels });
+    renderAccountsList();
+  });
 }
 
 function getLevelClass(level, config) {
@@ -1929,7 +2185,8 @@ function setupSettingsHandlers() {
 
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      const filename = `ikariam_backup_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+      const safeName = currentAccount ? currentAccount.name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' : '';
+      const filename = `ikagovernor_backup_${safeName}${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
 
       const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -2037,47 +2294,63 @@ function setupNavigation() {
   const viewSettings = document.getElementById('view-settings');
   const btnEdit = document.getElementById('btn-edit');
 
-  const switchView = (targetView) => {
-    currentView = targetView;
-    [navSummary, navConstruction, navTroops, navSettings].forEach(b => b.classList.remove('active'));
-    [viewSummary, viewConstruction, viewTroops, viewSettings].forEach(v => v.classList.add('hidden'));
+function switchView(targetView) {
+  const navSummary = document.getElementById('nav-btn-summary');
+  const navConstruction = document.getElementById('nav-btn-construction');
+  const navTroops = document.getElementById('nav-btn-troops');
+  const navSettings = document.getElementById('nav-btn-settings');
 
-    btnEdit.style.display = (targetView === 'construction') ? 'flex' : 'none';
+  const viewSummary = document.getElementById('view-summary');
+  const viewConstruction = document.getElementById('view-construction');
+  const viewTroops = document.getElementById('view-troops');
+  const viewSettings = document.getElementById('view-settings');
+  const btnEdit = document.getElementById('btn-edit');
 
-    if (targetView !== 'troops' && isMetaPanelOpen) {
-      closeMetaPanel();
+  currentView = targetView;
+  if (navSummary) [navSummary, navConstruction, navTroops, navSettings].forEach(b => b.classList.remove('active'));
+  if (viewSummary) [viewSummary, viewConstruction, viewTroops, viewSettings].forEach(v => v.classList.add('hidden'));
+
+  if (btnEdit) {
+    const isVisible = (targetView === 'construction' && !!currentAccount);
+    btnEdit.style.display = isVisible ? 'flex' : 'none';
+    btnEdit.classList.toggle('hidden', !isVisible);
+  }
+
+  if (targetView !== 'troops' && isMetaPanelOpen) {
+    closeMetaPanel();
+  }
+
+  if (targetView === 'summary') {
+    if (navSummary) navSummary.classList.add('active');
+    if (viewSummary) viewSummary.classList.remove('hidden');
+    renderSummary();
+  } else if (targetView === 'construction') {
+    if (navConstruction) navConstruction.classList.add('active');
+    if (viewConstruction) viewConstruction.classList.remove('hidden');
+    renderTabs();
+    renderMetaSummary();
+    renderContent();
+  } else if (targetView === 'troops') {
+    if (navTroops) navTroops.classList.add('active');
+    if (viewTroops) viewTroops.classList.remove('hidden');
+    renderTroopCityTabs();
+    if (isMetaPanelOpen) {
+      renderMetaPanel();
+    } else {
+      renderTroopsContent();
     }
+  } else if (targetView === 'settings') {
+    if (navSettings) navSettings.classList.add('active');
+    if (viewSettings) viewSettings.classList.remove('hidden');
+    populateCityRenameList();
+  }
+}
 
-    if (targetView === 'summary') {
-      navSummary.classList.add('active');
-      viewSummary.classList.remove('hidden');
-      renderSummary();
-    } else if (targetView === 'construction') {
-      navConstruction.classList.add('active');
-      viewConstruction.classList.remove('hidden');
-      renderTabs();
-      renderMetaSummary();
-      renderContent();
-    } else if (targetView === 'troops') {
-      navTroops.classList.add('active');
-      viewTroops.classList.remove('hidden');
-      renderTroopCityTabs();
-      if (isMetaPanelOpen) {
-        renderMetaPanel();
-      } else {
-        renderTroopsContent();
-      }
-    } else if (targetView === 'settings') {
-      navSettings.classList.add('active');
-      viewSettings.classList.remove('hidden');
-      populateCityRenameList();
-    }
-  };
-
-  navSummary.onclick = () => switchView('summary');
-  navConstruction.onclick = () => switchView('construction');
-  navTroops.onclick = () => switchView('troops');
-  navSettings.onclick = () => switchView('settings');
+function setupNavigation() {
+  document.getElementById('nav-btn-summary').onclick = () => switchView('summary');
+  document.getElementById('nav-btn-construction').onclick = () => switchView('construction');
+  document.getElementById('nav-btn-troops').onclick = () => switchView('troops');
+  document.getElementById('nav-btn-settings').onclick = () => switchView('settings');
 
   // Modales
   document.getElementById('btn-close-add-troops-modal').onclick = () => {
@@ -2097,14 +2370,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
   }
 
-  loadData(() => {
-    setupNavigation();
-    setupEditButton();
-    setupReorderBuildingsButton();
-    setupSettingsHandlers();
-    setupGlobalMetaPanel();
-    renderTabs();
-    renderMetaSummary();
-    renderContent();
-  });
+  setupNavigation();
+  setupEditButton();
+  setupReorderBuildingsButton();
+  setupSettingsHandlers();
+  setupGlobalMetaPanel();
+  setupAccountModals();
+
+  initAccounts();
 });
