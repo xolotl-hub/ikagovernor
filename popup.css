@@ -78,7 +78,11 @@ body {
   background: rgba(177, 67, 41, 0.6);
 }
 .tab {
-  padding: 8px 12px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px 10px 12px;
   margin-right: 5px;
   background-color: #e5dcb7;
   border: 1px solid #c2b58b;
@@ -88,6 +92,7 @@ body {
   color: #555;
   flex-shrink: 0;
   white-space: nowrap;
+  overflow: hidden;
   transition: background-color 0.2s, color 0.2s;
 }
 .tab:hover {
@@ -96,9 +101,28 @@ body {
 .tab.active {
   background-color: #f4eccd;
   color: #b14329;
-  border-bottom-color: #f4eccd;
+  border-bottom-color: transparent;
   box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
 }
+.tab-checkpoint-stripe {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  pointer-events: none;
+  transition: background-color 0.2s;
+}
+.tab.active .tab-checkpoint-stripe {
+  height: 4.5px;
+}
+.tab-checkpoint-stripe.lvl-default { background-color: #c8bfa2; }
+.tab-checkpoint-stripe.lvl-meta1 { background-color: #603813; }
+.tab-checkpoint-stripe.lvl-meta2 { background-color: #ca5c22; }
+.tab-checkpoint-stripe.lvl-meta3 { background-color: #5e942b; }
+.tab-checkpoint-stripe.lvl-meta4 { background-color: #1d82b3; }
+.tab-checkpoint-stripe.lvl-meta5 { background-color: #e5a93b; }
+.tab-checkpoint-stripe.lvl-meta6 { background-color: #95a5a6; }
 .building-meta-summary {
   display: flex;
   justify-content: center;
@@ -357,9 +381,51 @@ body {
 .city-name-container {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 28px;
+  justify-content: flex-start;
+  min-width: 44px;
   flex-shrink: 0;
+  gap: 4px;
+}
+.btn-add-inst {
+  background-color: #5e942b;
+  color: white;
+  border: 1px solid #4b7822;
+  border-radius: 3px;
+  width: 17px;
+  height: 17px;
+  font-size: 13px;
+  line-height: 15px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, transform 0.1s;
+}
+.btn-add-inst:hover {
+  background-color: #4b7822;
+  transform: scale(1.1);
+}
+.btn-del-inst {
+  background-color: #ca5c22;
+  color: white;
+  border: 1px solid #a84817;
+  border-radius: 3px;
+  width: 18px;
+  height: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: 4px;
+  transition: background-color 0.15s;
+}
+.btn-del-inst:hover {
+  background-color: #b14329;
 }
 .city-instances-list {
   display: flex;
@@ -524,6 +590,23 @@ body {
 }
 .backup-textarea.hidden {
   display: none;
+}
+.backup-toggle-container {
+  margin-top: 4px;
+  text-align: right;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: #8d4e28;
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-family: inherit;
+}
+.link-btn:hover {
+  color: #b14329;
 }
 .status-msg {
   font-size: 10px;

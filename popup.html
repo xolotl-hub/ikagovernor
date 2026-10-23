@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Ikariam Build Planner</title>
+  <title>Ika Governor</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -79,12 +79,22 @@
       <!-- Copia de seguridad (Importar/Exportar) -->
       <div class="settings-section">
         <h3>Copia de Seguridad</h3>
-        <p class="section-desc">Copia tus datos actuales o importa una copia existente en formato JSON.</p>
+        <p class="section-desc">Descarga una copia de seguridad en archivo .json o restaura una existente desde tu equipo.</p>
         <div class="backup-actions">
-          <button id="btn-export" class="btn-action">Exportar</button>
-          <button id="btn-import" class="btn-action">Importar</button>
+          <button id="btn-export-file" class="btn-action primary">📥 Guardar Archivo JSON</button>
+          <button id="btn-import-file" class="btn-action">📤 Cargar Archivo JSON</button>
+          <input type="file" id="input-import-file" accept=".json,application/json" class="hidden">
         </div>
-        <textarea id="txt-backup" class="backup-textarea hidden" placeholder="Pega el código JSON aquí para importar..."></textarea>
+        <div class="backup-toggle-container">
+          <button type="button" id="btn-toggle-manual" class="link-btn">Modo texto (copiar / pegar)</button>
+        </div>
+        <div id="manual-backup-container" class="hidden" style="margin-top: 6px;">
+          <div class="backup-actions">
+            <button id="btn-export" class="btn-action">Copiar al portapapeles</button>
+            <button id="btn-import" class="btn-action">Importar desde texto</button>
+          </div>
+          <textarea id="txt-backup" class="backup-textarea" placeholder="Pega el código JSON aquí para importar..."></textarea>
+        </div>
         <div id="backup-status" class="status-msg"></div>
       </div>
       

@@ -12,7 +12,7 @@ const DEFAULT_BUILDINGS = [
   { 
     name: "Depósito", 
     isMulti: true, 
-    instances: ["Depósito 1", "Depósito 2"], 
+    instPrefix: "D",
     meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 
   },
   { name: "Oficina del Arquitecto", meta1: 16, meta2: 32, meta3: 50, meta4: 50, meta5: 50, meta6: 50 },
@@ -21,7 +21,13 @@ const DEFAULT_BUILDINGS = [
   { name: "Prensa de Vino", meta1: 15, meta2: 30, meta3: 40, meta4: 45, meta5: 50, meta6: 50 },
   { name: "Aserradero", meta1: 15, meta2: 28, meta3: 35, meta4: 40, meta5: 45, meta6: 50 },
   { name: "Taberna", meta1: 12, meta2: 22, meta3: 32, meta4: 36, meta5: 40, meta6: 40 },
-  { name: "Almacén", meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 },
+  { 
+    name: "Almacén", 
+    isMulti: true, 
+    instPrefix: "A",
+    meta1: 14, meta2: 25, meta3: 35, meta4: 40, meta5: 45, meta6: 48 
+  },
+  { name: "Cronoforja", meta1: 10, meta2: 20, meta3: 30, meta4: 40, meta5: 50, meta6: 60 },
   { name: "Muralla", meta1: 15, meta2: 28, meta3: 40, meta4: 50, meta5: 60, meta6: 65 },
   { name: "Museo", meta1: 10, meta2: 25, meta3: 40, meta4: 45, meta5: 50, meta6: 50 }
 ];
@@ -36,6 +42,7 @@ const BUILDING_COSTS = {
   "Aserradero": { baseWood: 206, factorWood: 1.17, baseMarble: 118, factorMarble: 1.17, marbleStartLvl: 1 },
   "Taberna": { baseWood: 75, factorWood: 1.25, baseMarble: 12, factorMarble: 1.25, marbleStartLvl: 3 },
   "Almacén": { baseWood: 480, factorWood: 1.28, baseMarble: 240, factorMarble: 1.28, marbleStartLvl: 1 },
+  "Cronoforja": { baseWood: 250, factorWood: 1.25, baseMarble: 180, factorMarble: 1.25, marbleStartLvl: 1 },
   "Muralla": { baseWood: 60, factorWood: 1.25, baseMarble: 80, factorMarble: 1.25, marbleStartLvl: 1 },
   "Museo": { baseWood: 300, factorWood: 1.35, baseMarble: 200, factorMarble: 1.35, marbleStartLvl: 1 }
 };
@@ -143,7 +150,7 @@ function getInitialData() {
   cities.forEach(city => {
     data[city] = {};
     buildingsConfig.forEach(b => {
-      data[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+      data[city][b.name] = b.isMulti ? (b.name === "Depósito" ? [0, 0] : [0]) : 0;
     });
   });
   return data;
@@ -225,10 +232,10 @@ function loadData(callback) {
 
         buildingsConfig.forEach(b => {
           if (appData[city][b.name] === undefined) {
-            appData[city][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+            appData[city][b.name] = b.isMulti ? (b.name === "Depósito" ? [0, 0] : [0]) : 0;
             updated = true;
           } else if (b.isMulti && !Array.isArray(appData[city][b.name])) {
-            appData[city][b.name] = [appData[city][b.name] || 0, 0];
+            appData[city][b.name] = [appData[city][b.name] || 0];
             updated = true;
           }
         });
@@ -288,18 +295,58 @@ function getLevelClass(level, config) {
   return "lvl-default";
 }
 
+function getBuildingLowestAchievedClass(building) {
+  if (!cities || cities.length === 0) return "lvl-default";
+  const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
+  const classNames = ["lvl-meta1", "lvl-meta2", "lvl-meta3", "lvl-meta4", "lvl-meta5", "lvl-meta6"];
+  
+  let highestMet = -1;
+  for (let i = 0; i < metaKeys.length; i++) {
+    const targetValue = building[metaKeys[i]];
+    if (!targetValue) continue;
+    const allMeet = cities.every(city => {
+      const val = appData[city]?.[building.name];
+      if (building.isMulti && Array.isArray(val)) {
+        if (val.length === 0) return false;
+        return val.every(l => (l || 0) >= targetValue);
+      }
+      return (val || 0) >= targetValue;
+    });
+    if (allMeet) {
+      highestMet = i;
+    } else {
+      break;
+    }
+  }
+  return highestMet >= 0 ? classNames[highestMet] : "lvl-default";
+}
+
 function renderTabs() {
   const tabsContainer = document.getElementById('tabs');
   tabsContainer.innerHTML = '';
   
   let draggedBuildingIndex = null;
+  const metaLabels = ["Madera (Meta 1)", "Cobre (Meta 2)", "Verde (Meta 3)", "Azul (Meta 4)", "Dorado (Meta 5)", "Platino (Meta 6)"];
+  const classNames = ["lvl-meta1", "lvl-meta2", "lvl-meta3", "lvl-meta4", "lvl-meta5", "lvl-meta6"];
 
   buildingsConfig.forEach((b, idx) => {
     const tab = document.createElement('div');
     const isActive = b.name === currentBuilding.name;
-    tab.className = `tab ${isActive ? 'active' : ''}`;
-    tab.textContent = b.name;
-    tab.title = isReorderingBuildings ? `Arrastra para mover: ${b.name}` : b.name;
+    const lowestClass = getBuildingLowestAchievedClass(b);
+    tab.className = `tab ${isActive ? 'active' : ''} tab-${lowestClass}`;
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'tab-label';
+    labelSpan.textContent = b.name;
+    tab.appendChild(labelSpan);
+
+    const stripe = document.createElement('div');
+    stripe.className = `tab-checkpoint-stripe ${lowestClass}`;
+    tab.appendChild(stripe);
+
+    const lowestIdx = classNames.indexOf(lowestClass);
+    const statusText = lowestIdx >= 0 ? `Completado: ${metaLabels[lowestIdx]}` : 'Sin meta completada';
+    tab.title = isReorderingBuildings ? `Arrastra para mover: ${b.name}` : `${b.name} (${statusText})`;
 
     if (isReorderingBuildings) {
       tab.draggable = true;
@@ -430,6 +477,36 @@ function renderMetaSummary() {
   });
 }
 
+function syncEditInputsToData() {
+  const metaInputs = document.querySelectorAll('.meta-input');
+  metaInputs.forEach(input => {
+    const key = input.getAttribute('data-meta-key');
+    const val = parseInt(input.value, 10);
+    currentBuilding[key] = isNaN(val) ? 0 : Math.max(0, val);
+  });
+  
+  const levelInputs = document.querySelectorAll('.level-input');
+  const newMultiLevels = {};
+  levelInputs.forEach(input => {
+    const city = input.getAttribute('data-city');
+    const val = parseInt(input.value, 10);
+    const cleanVal = isNaN(val) ? 0 : Math.max(0, val);
+    const instIdxAttr = input.getAttribute('data-inst-idx');
+
+    if (instIdxAttr !== null) {
+      const instIdx = parseInt(instIdxAttr, 10);
+      if (!newMultiLevels[city]) newMultiLevels[city] = [];
+      newMultiLevels[city][instIdx] = cleanVal;
+    } else {
+      appData[city][currentBuilding.name] = cleanVal;
+    }
+  });
+
+  for (const city in newMultiLevels) {
+    appData[city][currentBuilding.name] = newMultiLevels[city];
+  }
+}
+
 function renderContent() {
   const content = document.getElementById('content');
   content.innerHTML = '';
@@ -453,27 +530,48 @@ function renderContent() {
       nameSpan.textContent = shortCode;
       nameSpan.title = fullName;
       nameContainer.appendChild(nameSpan);
+
+      if (isEditing && (currentBuilding.name === "Depósito" || currentBuilding.name === "Almacén")) {
+        const addInstBtn = document.createElement('button');
+        addInstBtn.type = 'button';
+        addInstBtn.className = 'btn-add-inst';
+        addInstBtn.textContent = '+';
+        addInstBtn.title = 'Añadir otro edificio a esta ciudad';
+        addInstBtn.onclick = () => {
+          syncEditInputsToData();
+          let arr = appData[city][currentBuilding.name];
+          if (!Array.isArray(arr)) arr = [arr || 0];
+          arr.push(0);
+          appData[city][currentBuilding.name] = arr;
+          renderContent();
+        };
+        nameContainer.appendChild(addInstBtn);
+      }
+
       row.appendChild(nameContainer);
 
       const instancesList = document.createElement('div');
       instancesList.className = 'city-instances-list';
 
-      const levels = appData[city]?.[currentBuilding.name] || [0, 0];
+      const rawLevels = appData[city]?.[currentBuilding.name];
+      let levels = Array.isArray(rawLevels) ? [...rawLevels] : [rawLevels || 0];
+      if (levels.length === 0) levels = [0];
 
-      currentBuilding.instances.forEach((instName, instIdx) => {
+      const prefix = currentBuilding.instPrefix || (currentBuilding.name === 'Almacén' ? 'A' : 'D');
+
+      levels.forEach((level, instIdx) => {
         const instRow = document.createElement('div');
         instRow.className = 'city-instance-row';
 
         const instLabel = document.createElement('span');
         instLabel.className = 'instance-label';
-        instLabel.textContent = instIdx === 0 ? 'D1' : 'D2';
+        instLabel.textContent = `${prefix}${instIdx + 1}`;
         instRow.appendChild(instLabel);
 
         const progressContainer = document.createElement('div');
         progressContainer.className = 'progress-container';
         
         const progressFill = document.createElement('div');
-        const level = levels[instIdx] || 0;
         const lvlClass = getLevelClass(level, currentBuilding);
         progressFill.className = `progress-fill ${lvlClass}`;
         const pct = Math.min(100, (level / maxGoal) * 100);
@@ -515,6 +613,24 @@ function renderContent() {
           input.setAttribute('data-city', city);
           input.setAttribute('data-inst-idx', instIdx);
           controls.appendChild(input);
+
+          if (levels.length > 1 && (currentBuilding.name === "Depósito" || currentBuilding.name === "Almacén")) {
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn-del-inst';
+            delBtn.textContent = '✕';
+            delBtn.title = 'Eliminar este edificio';
+            delBtn.onclick = () => {
+              syncEditInputsToData();
+              let curArr = appData[city][currentBuilding.name];
+              if (Array.isArray(curArr) && curArr.length > 1) {
+                curArr.splice(instIdx, 1);
+                appData[city][currentBuilding.name] = curArr;
+                renderContent();
+              }
+            };
+            controls.appendChild(delBtn);
+          }
         } else {
           const minusBtn = document.createElement('button');
           minusBtn.className = 'btn';
@@ -538,6 +654,7 @@ function renderContent() {
             progressFill.style.width = `${Math.min(100, (newLevel / maxGoal) * 100)}%`;
             saveData();
             renderMetaSummary();
+            renderTabs();
             if (costEl) {
               const uCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
               if (uCost) {
@@ -661,6 +778,7 @@ function renderContent() {
           
           saveData();
           renderMetaSummary();
+          renderTabs();
           if (costEl) {
             const updatedCost = getBuildingUpgradeCost(currentBuilding.name, newLevel, city);
             if (updatedCost) {
@@ -720,30 +838,7 @@ function setupEditButton() {
       renderMetaSummary();
       renderContent();
     } else {
-      const metaInputs = document.querySelectorAll('.meta-input');
-      metaInputs.forEach(input => {
-        const key = input.getAttribute('data-meta-key');
-        const val = parseInt(input.value, 10);
-        currentBuilding[key] = isNaN(val) ? 0 : Math.max(0, val);
-      });
-      
-      const levelInputs = document.querySelectorAll('.level-input');
-      levelInputs.forEach(input => {
-        const city = input.getAttribute('data-city');
-        const val = parseInt(input.value, 10);
-        const cleanVal = isNaN(val) ? 0 : Math.max(0, val);
-        const instIdxAttr = input.getAttribute('data-inst-idx');
-
-        if (instIdxAttr !== null) {
-          const instIdx = parseInt(instIdxAttr, 10);
-          if (!Array.isArray(appData[city][currentBuilding.name])) {
-            appData[city][currentBuilding.name] = [0, 0];
-          }
-          appData[city][currentBuilding.name][instIdx] = cleanVal;
-        } else {
-          appData[city][currentBuilding.name] = cleanVal;
-        }
-      });
+      syncEditInputsToData();
       
       isEditing = false;
       btnEdit.textContent = '✏️';
@@ -752,6 +847,7 @@ function setupEditButton() {
       
       saveData();
       renderMetaSummary();
+      renderTabs();
       renderContent();
       renderSummary();
     }
@@ -782,10 +878,11 @@ function renderSummary() {
       const val = appData[city]?.[building.name];
 
       if (building.isMulti && Array.isArray(val)) {
+        const pfx = building.instPrefix || (building.name === 'Almacén' ? 'A' : 'D');
         val.forEach((instLvl, instIdx) => {
           if (instLvl < targetValue) {
             candidateTasks.push({
-              buildingName: `${building.name} (D${instIdx + 1})`,
+              buildingName: `${building.name} (${pfx}${instIdx + 1})`,
               rawBuildingName: building.name,
               city: city,
               currentLevel: instLvl,
@@ -1689,6 +1786,11 @@ function populateCityRenameList() {
 }
 
 function setupSettingsHandlers() {
+  const btnExportFile = document.getElementById('btn-export-file');
+  const btnImportFile = document.getElementById('btn-import-file');
+  const inputImportFile = document.getElementById('input-import-file');
+  const btnToggleManual = document.getElementById('btn-toggle-manual');
+  const manualBackupContainer = document.getElementById('manual-backup-container');
   const btnExport = document.getElementById('btn-export');
   const btnImport = document.getElementById('btn-import');
   const txtBackup = document.getElementById('txt-backup');
@@ -1702,7 +1804,7 @@ function setupSettingsHandlers() {
 
     appData[newCityId] = {};
     buildingsConfig.forEach(b => {
-      appData[newCityId][b.name] = b.isMulti ? b.instances.map(() => 0) : 0;
+      appData[newCityId][b.name] = b.isMulti ? (b.name === "Depósito" ? [0, 0] : [0]) : 0;
     });
 
     cityLabels[newCityId] = {
@@ -1770,82 +1872,152 @@ function setupSettingsHandlers() {
     document.getElementById('modal-confirm-delete').classList.add('hidden');
   };
   
-  // Backup Export/Import
-  btnExport.onclick = () => {
-    const dataToExport = {
+  // Backup Export/Import Helpers
+  function generateBackupData() {
+    return {
       ikariamLevels: appData,
       ikariamBuildings: buildingsConfig,
       ikariamCityLabels: cityLabels,
       ikariamCitiesList: cities,
       ikariamTroops: troopsData
     };
-    const jsonStr = JSON.stringify(dataToExport, null, 2);
-    txtBackup.value = jsonStr;
-    txtBackup.classList.remove('hidden');
-    txtBackup.select();
-    
-    navigator.clipboard.writeText(jsonStr)
-      .then(() => {
-        showBackupStatus("¡Copia de seguridad copiada al portapapeles!", true);
-      })
-      .catch(() => {
-        showBackupStatus("Exportado. Copia el texto del recuadro.", true);
-      });
-  };
-  
-  btnImport.onclick = () => {
-    if (txtBackup.classList.contains('hidden')) {
-      txtBackup.classList.remove('hidden');
-      txtBackup.value = '';
-      showBackupStatus("Pega el JSON en el recuadro y presiona 'Importar' de nuevo.", false);
-      return;
+  }
+
+  function processBackupImport(parsed, sourceLabel = "") {
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error("El archivo no contiene un JSON válido.");
     }
-    
-    const inputStr = txtBackup.value.trim();
-    if (!inputStr) {
-      showBackupStatus("El recuadro está vacío.", false);
-      return;
+    if (!parsed.ikariamLevels) {
+      throw new Error("Formato no válido: falta la clave 'ikariamLevels'");
     }
-    
-    try {
-      const parsed = JSON.parse(inputStr);
-      if (!parsed.ikariamLevels) {
-        throw new Error("Falta la clave 'ikariamLevels'");
-      }
-      
-      appData = parsed.ikariamLevels;
-      if (parsed.ikariamBuildings) {
-        buildingsConfig = parsed.ikariamBuildings;
-      }
-      if (parsed.ikariamCitiesList && Array.isArray(parsed.ikariamCitiesList)) {
-        cities = parsed.ikariamCitiesList;
-      }
-      cityLabels = parsed.ikariamCityLabels || {};
-      if (parsed.ikariamTroops) {
-        troopsData = parsed.ikariamTroops;
-      }
-      
-      saveData();
-      saveCitiesList();
-      saveCityLabels();
-      saveTroopsData();
-      
-      loadData(() => {
-        renderTabs();
-        renderMetaSummary();
-        renderContent();
-        renderTroopCityTabs();
-        renderTroopsContent();
-        renderSummary();
-        populateCityRenameList();
-        showBackupStatus("¡Datos importados con éxito!", true);
-      });
-      
-    } catch (err) {
-      showBackupStatus("JSON inválido: " + err.message, false);
+
+    appData = parsed.ikariamLevels;
+    if (parsed.ikariamBuildings) {
+      buildingsConfig = parsed.ikariamBuildings;
     }
-  };
-  
+    if (parsed.ikariamCitiesList && Array.isArray(parsed.ikariamCitiesList)) {
+      cities = parsed.ikariamCitiesList;
+    }
+    cityLabels = parsed.ikariamCityLabels || {};
+    if (parsed.ikariamTroops) {
+      troopsData = parsed.ikariamTroops;
+    }
+
+    saveData();
+    saveCitiesList();
+    saveCityLabels();
+    saveTroopsData();
+
+    loadData(() => {
+      renderTabs();
+      renderMetaSummary();
+      renderContent();
+      renderTroopCityTabs();
+      renderTroopsContent();
+      renderSummary();
+      populateCityRenameList();
+      const origin = sourceLabel ? ` (${sourceLabel})` : "";
+      showBackupStatus(`¡Datos importados con éxito${origin}!`, true);
+    });
+  }
+
+  // 1. Exportar a Archivo JSON (Descarga directa)
+  if (btnExportFile) {
+    btnExportFile.onclick = () => {
+      const dataToExport = generateBackupData();
+      const jsonStr = JSON.stringify(dataToExport, null, 2);
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const filename = `ikariam_backup_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      showBackupStatus(`¡Archivo descargado: ${filename}!`, true);
+    };
+  }
+
+  // 2. Importar desde Archivo JSON (Selector de archivo nativo)
+  if (btnImportFile && inputImportFile) {
+    btnImportFile.onclick = () => {
+      inputImportFile.value = '';
+      inputImportFile.click();
+    };
+
+    inputImportFile.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          processBackupImport(parsed, file.name);
+        } catch (err) {
+          showBackupStatus("Error al procesar el archivo: " + err.message, false);
+        }
+      };
+      reader.onerror = () => {
+        showBackupStatus("No se pudo leer el archivo seleccionado.", false);
+      };
+      reader.readAsText(file, "UTF-8");
+    };
+  }
+
+  // 3. Alternar vista manual / texto
+  if (btnToggleManual && manualBackupContainer) {
+    btnToggleManual.onclick = () => {
+      manualBackupContainer.classList.toggle('hidden');
+    };
+  }
+
+  // 4. Copiar texto al portapapeles
+  if (btnExport) {
+    btnExport.onclick = () => {
+      const dataToExport = generateBackupData();
+      const jsonStr = JSON.stringify(dataToExport, null, 2);
+      if (txtBackup) {
+        txtBackup.value = jsonStr;
+        txtBackup.select();
+      }
+
+      navigator.clipboard.writeText(jsonStr)
+        .then(() => {
+          showBackupStatus("¡Copia de seguridad copiada al portapapeles!", true);
+        })
+        .catch(() => {
+          showBackupStatus("Exportado al recuadro de texto.", true);
+        });
+    };
+  }
+
+  // 5. Importar texto pegado
+  if (btnImport) {
+    btnImport.onclick = () => {
+      if (!txtBackup) return;
+      const inputStr = txtBackup.value.trim();
+      if (!inputStr) {
+        showBackupStatus("El recuadro está vacío.", false);
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(inputStr);
+        processBackupImport(parsed, "texto");
+      } catch (err) {
+        showBackupStatus("JSON inválido: " + err.message, false);
+      }
+    };
+  }
+
   function showBackupStatus(msg, isSuccess) {
     backupStatus.textContent = msg;
     backupStatus.className = `status-msg ${isSuccess ? 'success' : 'error'}`;
