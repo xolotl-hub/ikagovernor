@@ -510,6 +510,240 @@ function setupAccountModals() {
   }
 }
 
+function findLegacyDataInStorage(allStorage) {
+  if (!allStorage || typeof allStorage !== 'object') return null;
+
+  // 1. Estándar
+  if (allStorage.ikariamLevels && typeof allStorage.ikariamLevels === 'object' && Object.keys(allStorage.ikariamLevels).length > 0) {
+    return {
+      levels: allStorage.ikariamLevels,
+      buildings: allStorage.ikariamBuildings || null,
+      cities: allStorage.ikariamCitiesList || Object.keys(allStorage.ikariamLevels),
+      cityLabels: allStorage.ikariamCityLabels || null,
+      troops: allStorage.ikariamTroops || null
+    };
+  }
+
+  // 2. Si hay ikariamCitiesList
+  if (allStorage.ikariamCitiesList && Array.isArray(allStorage.ikariamCitiesList) && allStorage.ikariamCitiesList.length > 0) {
+    return {
+      levels: allStorage.ikariamLevels || null,
+      buildings: allStorage.ikariamBuildings || null,
+      cities: allStorage.ikariamCitiesList,
+      cityLabels: allStorage.ikariamCityLabels || null,
+      troops: allStorage.ikariamTroops || null
+    };
+  }
+
+  // 3. Búsqueda profunda en todas las claves
+  for (const k of Object.keys(allStorage)) {
+    if (k.startsWith('ikariam_acc_data_')) continue;
+    const val = allStorage[k];
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const subVals = Object.values(val);
+      if (subVals.length > 0 && typeof subVals[0] === 'object' && subVals[0] !== null) {
+        if (subVals[0]["Intendencia"] !== undefined || subVals[0]["Depósito"] !== undefined || subVals[0]["Almacén"] !== undefined) {
+          return {
+            levels: val,
+            buildings: allStorage.ikariamBuildings || null,
+            cities: Object.keys(val),
+            cityLabels: allStorage.ikariamCityLabels || null,
+            troops: allStorage.ikariamTroops || null
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function processHomeBackupImport(parsed, sourceLabel) {
+  if (!parsed || typeof parsed !== 'object') {
+    showHomeBackupStatus("El formato del archivo no es válido.", false);
+    return;
+  }
+
+  let importedLevels = parsed.ikariamLevels;
+  let importedCities = parsed.ikariamCitiesList;
+  let importedBuildings = parsed.ikariamBuildings;
+  let importedLabels = parsed.ikariamCityLabels || {};
+  let importedTroops = parsed.ikariamTroops || null;
+
+  if (!importedLevels) {
+    const firstVal = Object.values(parsed)[0];
+    if (firstVal && typeof firstVal === 'object' && (firstVal["Intendencia"] !== undefined || firstVal["Depósito"] !== undefined)) {
+      importedLevels = parsed;
+      importedCities = Object.keys(parsed);
+    }
+  }
+
+  if (!importedLevels && !importedCities) {
+    showHomeBackupStatus("No se encontraron ciudades ni niveles en el archivo.", false);
+    return;
+  }
+
+  let accName = "Cuenta 1";
+  if (parsed.ikariamAccount && parsed.ikariamAccount.name) {
+    accName = parsed.ikariamAccount.name;
+  } else if (sourceLabel && typeof sourceLabel === 'string') {
+    const cleanLabel = sourceLabel.replace(/\.json$/i, '').replace(/ikariam_backup_/i, '').replace(/ikagovernor_backup_/i, '').trim();
+    if (cleanLabel && cleanLabel !== 'texto') accName = cleanLabel;
+  }
+
+  const worldVal = parsed.ikariamAccount?.world || "";
+
+  const newAcc = {
+    id: "acc_" + Date.now(),
+    name: accName,
+    world: worldVal,
+    createdAt: Date.now()
+  };
+
+  const bundle = {
+    levels: importedLevels || getInitialData(),
+    buildings: importedBuildings || null,
+    cities: importedCities || [...DEFAULT_CITIES],
+    cityLabels: importedLabels,
+    troops: importedTroops
+  };
+
+  accounts.push(newAcc);
+
+  chrome.storage.local.set({
+    ikariamAccounts: accounts,
+    ['ikariam_acc_data_' + newAcc.id]: bundle
+  }, () => {
+    showHomeBackupStatus(`¡Cuenta "${newAcc.name}" restaurada con éxito!`, true);
+    setTimeout(() => {
+      selectAccount(newAcc);
+    }, 350);
+  });
+}
+
+function showHomeBackupStatus(msg, isSuccess) {
+  const el = document.getElementById('home-backup-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `status-msg ${isSuccess ? 'success' : 'error'}`;
+}
+
+function setupHomeBackupHandlers() {
+  const btnExportFile = document.getElementById('btn-home-export-file');
+  const btnImportFile = document.getElementById('btn-home-import-file');
+  const inputImportFile = document.getElementById('input-home-import-file');
+  const btnToggleManual = document.getElementById('btn-home-toggle-manual');
+  const manualContainer = document.getElementById('manual-home-backup-container');
+  const btnExport = document.getElementById('btn-home-export');
+  const btnImport = document.getElementById('btn-home-import');
+  const txtBackup = document.getElementById('txt-home-backup');
+
+  if (btnImportFile && inputImportFile) {
+    btnImportFile.onclick = () => {
+      inputImportFile.value = '';
+      inputImportFile.click();
+    };
+
+    inputImportFile.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          processHomeBackupImport(parsed, file.name);
+        } catch (err) {
+          showHomeBackupStatus("Error al leer el archivo JSON: " + err.message, false);
+        }
+      };
+      reader.onerror = () => {
+        showHomeBackupStatus("No se pudo leer el archivo seleccionado.", false);
+      };
+      reader.readAsText(file, "UTF-8");
+    };
+  }
+
+  if (btnExportFile) {
+    btnExportFile.onclick = () => {
+      chrome.storage.local.get(null, (fullStorage) => {
+        let dataToExport = null;
+        if (currentAccount) {
+          dataToExport = generateBackupData();
+        } else if (accounts.length > 0) {
+          const firstId = accounts[0].id;
+          const bundle = fullStorage['ikariam_acc_data_' + firstId] || {};
+          dataToExport = {
+            ikariamAccount: { name: accounts[0].name, world: accounts[0].world },
+            ikariamLevels: bundle.levels || {},
+            ikariamBuildings: bundle.buildings || DEFAULT_BUILDINGS,
+            ikariamCitiesList: bundle.cities || DEFAULT_CITIES,
+            ikariamCityLabels: bundle.cityLabels || {},
+            ikariamTroops: bundle.troops || null,
+            exportDate: new Date().toISOString(),
+            version: "1.0"
+          };
+        } else {
+          dataToExport = fullStorage;
+        }
+
+        const jsonStr = JSON.stringify(dataToExport, null, 2);
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const filename = `ikagovernor_backup_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        showHomeBackupStatus(`¡Archivo descargado: ${filename}!`, true);
+      });
+    };
+  }
+
+  if (btnToggleManual && manualContainer) {
+    btnToggleManual.onclick = () => {
+      manualContainer.classList.toggle('hidden');
+    };
+  }
+
+  if (btnExport) {
+    btnExport.onclick = () => {
+      chrome.storage.local.get(null, (fullStorage) => {
+        let dataToExport = currentAccount ? generateBackupData() : fullStorage;
+        const jsonStr = JSON.stringify(dataToExport, null, 2);
+        if (txtBackup) txtBackup.value = jsonStr;
+        navigator.clipboard.writeText(jsonStr)
+          .then(() => showHomeBackupStatus("¡Copia copiada al portapapeles!", true))
+          .catch(() => showHomeBackupStatus("Exportado al cuadro de texto.", true));
+      });
+    };
+  }
+
+  if (btnImport) {
+    btnImport.onclick = () => {
+      if (!txtBackup) return;
+      const inputStr = txtBackup.value.trim();
+      if (!inputStr) {
+        showHomeBackupStatus("El cuadro de texto está vacío.", false);
+        return;
+      }
+      try {
+        const parsed = JSON.parse(inputStr);
+        processHomeBackupImport(parsed, "texto");
+      } catch (err) {
+        showHomeBackupStatus("JSON inválido: " + err.message, false);
+      }
+    };
+  }
+}
+
 function initAccounts() {
   chrome.storage.local.get(null, (result) => {
     // 1. Si ya existen cuentas guardadas
@@ -520,14 +754,8 @@ function initAccounts() {
     }
 
     // 2. Si no hay cuentas o ikariamAccounts estaba vacío, comprobar si hay datos previos para migrarlos a Cuenta 1
-    const hasLegacy = result && (
-      (result.ikariamLevels && Object.keys(result.ikariamLevels).length > 0) ||
-      (result.ikariamCitiesList && result.ikariamCitiesList.length > 0) ||
-      (result.ikariamBuildings && result.ikariamBuildings.length > 0) ||
-      (result.ikariamTroops && (result.ikariamTroops.activeTroopCity || (result.ikariamTroops.cities && Object.keys(result.ikariamTroops.cities).length > 0)))
-    );
-
-    if (hasLegacy) {
+    const legacy = findLegacyDataInStorage(result);
+    if (legacy) {
       const defaultAcc = {
         id: "acc_1",
         name: "Cuenta 1",
@@ -535,16 +763,9 @@ function initAccounts() {
         createdAt: Date.now()
       };
       accounts = [defaultAcc];
-      const legacyBundle = {
-        levels: result.ikariamLevels || null,
-        buildings: result.ikariamBuildings || null,
-        cities: result.ikariamCitiesList || null,
-        cityLabels: result.ikariamCityLabels || null,
-        troops: result.ikariamTroops || null
-      };
       chrome.storage.local.set({
         ikariamAccounts: accounts,
-        ['ikariam_acc_data_' + defaultAcc.id]: legacyBundle
+        ['ikariam_acc_data_' + defaultAcc.id]: legacy
       }, () => {
         renderAccountsList();
       });
@@ -2390,6 +2611,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSettingsHandlers();
   setupGlobalMetaPanel();
   setupAccountModals();
+  setupHomeBackupHandlers();
 
   initAccounts();
 });

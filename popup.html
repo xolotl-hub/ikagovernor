@@ -15,10 +15,36 @@
     </div>
 
     <div class="accounts-actions-bar">
-      <button id="btn-open-add-account" class="btn-action primary" style="width: 100%; font-size: 13px; padding: 9px;">+ Agregar Cuenta</button>
+      <button id="btn-open-add-account" class="btn-action primary" style="width: 100%; font-size: 13px; padding: 9px;" onclick="document.getElementById('modal-add-account').classList.remove('hidden'); document.getElementById('input-account-name').focus();">+ Agregar Cuenta</button>
     </div>
 
     <div id="accounts-list" class="accounts-list"></div>
+
+    <!-- Sección de Respaldo / Restauración en Inicio -->
+    <div class="home-backup-card">
+      <div class="home-backup-title">💾 Copia de Seguridad</div>
+      <p class="section-desc" style="margin-bottom:8px;">Importa un archivo JSON para restaurar tus ciudades o guarda una copia:</p>
+      
+      <div class="backup-actions">
+        <button id="btn-home-import-file" class="btn-action primary">📤 Cargar Archivo JSON</button>
+        <button id="btn-home-export-file" class="btn-action">📥 Guardar Archivo JSON</button>
+        <input type="file" id="input-home-import-file" accept=".json,application/json" class="hidden">
+      </div>
+      
+      <div class="backup-toggle-container" style="margin-top:6px;">
+        <button type="button" id="btn-home-toggle-manual" class="link-btn">Modo texto (copiar / pegar)</button>
+      </div>
+
+      <div id="manual-home-backup-container" class="hidden" style="margin-top: 6px;">
+        <div class="backup-actions">
+          <button id="btn-home-export" class="btn-action">Copiar al portapapeles</button>
+          <button id="btn-home-import" class="btn-action primary">Importar desde texto</button>
+        </div>
+        <textarea id="txt-home-backup" class="backup-textarea" placeholder="Pega el código JSON de tu respaldo aquí..."></textarea>
+      </div>
+      
+      <div id="home-backup-status" class="status-msg"></div>
+    </div>
   </div>
 
   <!-- Contenedor Principal de la Aplicación (Oculto hasta seleccionar cuenta) -->
