@@ -666,26 +666,17 @@ function setupHomeBackupHandlers() {
 
   if (btnExportFile) {
     btnExportFile.onclick = () => {
-      chrome.storage.local.get(null, (fullStorage) => {
-        let dataToExport = null;
-        if (currentAccount) {
-          dataToExport = generateBackupData();
-        } else if (accounts.length > 0) {
-          const firstId = accounts[0].id;
-          const bundle = fullStorage['ikariam_acc_data_' + firstId] || {};
-          dataToExport = {
-            ikariamAccount: { name: accounts[0].name, world: accounts[0].world },
-            ikariamLevels: bundle.levels || {},
-            ikariamBuildings: bundle.buildings || DEFAULT_BUILDINGS,
-            ikariamCitiesList: bundle.cities || DEFAULT_CITIES,
-            ikariamCityLabels: bundle.cityLabels || {},
-            ikariamTroops: bundle.troops || null,
-            exportDate: new Date().toISOString(),
-            version: "1.0"
-          };
-        } else {
-          dataToExport = fullStorage;
-        }
+      const LEGACY_KEYS = ['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'];
+      chrome.storage.local.get(LEGACY_KEYS, (legacyData) => {
+        const dataToExport = {
+          ikariamLevels:      legacyData.ikariamLevels      || appData,
+          ikariamBuildings:   legacyData.ikariamBuildings   || buildingsConfig,
+          ikariamCityLabels:  legacyData.ikariamCityLabels  || cityLabels,
+          ikariamCitiesList:  legacyData.ikariamCitiesList  || cities,
+          ikariamTroops:      legacyData.ikariamTroops      || troopsData,
+          exportDate: new Date().toISOString(),
+          version: "1.0"
+        };
 
         const jsonStr = JSON.stringify(dataToExport, null, 2);
         const now = new Date();
@@ -715,8 +706,17 @@ function setupHomeBackupHandlers() {
 
   if (btnExport) {
     btnExport.onclick = () => {
-      chrome.storage.local.get(null, (fullStorage) => {
-        let dataToExport = currentAccount ? generateBackupData() : fullStorage;
+      const LEGACY_KEYS = ['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'];
+      chrome.storage.local.get(LEGACY_KEYS, (legacyData) => {
+        const dataToExport = {
+          ikariamLevels:      legacyData.ikariamLevels      || appData,
+          ikariamBuildings:   legacyData.ikariamBuildings   || buildingsConfig,
+          ikariamCityLabels:  legacyData.ikariamCityLabels  || cityLabels,
+          ikariamCitiesList:  legacyData.ikariamCitiesList  || cities,
+          ikariamTroops:      legacyData.ikariamTroops      || troopsData,
+          exportDate: new Date().toISOString(),
+          version: "1.0"
+        };
         const jsonStr = JSON.stringify(dataToExport, null, 2);
         if (txtBackup) txtBackup.value = jsonStr;
         navigator.clipboard.writeText(jsonStr)
