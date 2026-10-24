@@ -78,7 +78,13 @@ const TROOP_DEFINITIONS = {
   ]
 };
 
-let accounts = [];
+const DEFAULT_ACCOUNT = {
+  id: "acc_1",
+  name: "Cuenta 1",
+  world: "",
+  createdAt: 1700000000000
+};
+let accounts = [DEFAULT_ACCOUNT];
 let currentAccount = null;
 let accountToDelete = null;
 
@@ -572,9 +578,11 @@ function findLegacyDataInStorage(allStorage) {
 }
 
 function initAccounts() {
+  renderAccountsList();
+
   chrome.storage.local.get(null, (result) => {
     // 1. Si ya existen cuentas guardadas
-    if (result && result.ikariamAccounts && Array.isArray(result.ikariamAccounts) && result.ikariamAccounts.length > 0) {
+    if (result && Array.isArray(result.ikariamAccounts) && result.ikariamAccounts.length > 0) {
       accounts = result.ikariamAccounts;
       renderAccountsList();
       return;
@@ -583,42 +591,31 @@ function initAccounts() {
     // 2. Si hay datos previos legacy, migrarlos a Cuenta 1
     const legacy = findLegacyDataInStorage(result);
     if (legacy) {
-      const defaultAcc = {
-        id: "acc_1",
-        name: "Cuenta 1",
-        world: "",
-        createdAt: Date.now()
-      };
-      accounts = [defaultAcc];
+      accounts = [DEFAULT_ACCOUNT];
       chrome.storage.local.set({
         ikariamAccounts: accounts,
-        ['ikariam_acc_data_' + defaultAcc.id]: legacy
+        ['ikariam_acc_data_' + DEFAULT_ACCOUNT.id]: legacy
       }, () => {
         renderAccountsList();
       });
-    } else {
-      // 3. Instalación nueva: crear cuenta por defecto limpia
-      const defaultAcc = {
-        id: "acc_1",
-        name: "Cuenta 1",
-        world: "",
-        createdAt: Date.now()
-      };
-      accounts = [defaultAcc];
-      const freshBundle = {
-        levels: getInitialData(),
-        buildings: JSON.parse(JSON.stringify(DEFAULT_BUILDINGS)),
-        cities: [...DEFAULT_CITIES],
-        cityLabels: { ...DEFAULT_CITY_LABELS },
-        troops: { activeTroopCity: DEFAULT_CITIES[0], cities: {} }
-      };
-      chrome.storage.local.set({
-        ikariamAccounts: accounts,
-        ['ikariam_acc_data_' + defaultAcc.id]: freshBundle
-      }, () => {
-        renderAccountsList();
-      });
+      return;
     }
+
+    // 3. Instalación nueva o storage vacío: inicializar Cuenta 1
+    accounts = [DEFAULT_ACCOUNT];
+    const freshBundle = {
+      levels: getInitialData(),
+      buildings: JSON.parse(JSON.stringify(DEFAULT_BUILDINGS)),
+      cities: [...DEFAULT_CITIES],
+      cityLabels: { ...DEFAULT_CITY_LABELS },
+      troops: { activeTroopCity: DEFAULT_CITIES[0], cities: {} }
+    };
+    chrome.storage.local.set({
+      ikariamAccounts: accounts,
+      ['ikariam_acc_data_' + DEFAULT_ACCOUNT.id]: freshBundle
+    }, () => {
+      renderAccountsList();
+    });
   });
 }
 
