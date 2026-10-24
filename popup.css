@@ -1402,20 +1402,6 @@ body {
   color: #7b7050;
   font-size: 12px;
 }
-.home-backup-card {
-  margin-top: 14px;
-  padding: 10px 12px;
-  background: #fdfaf2;
-  border: 1px solid #c2b58b;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.home-backup-title {
-  font-size: 12px;
-  font-weight: bold;
-  color: #b14329;
-  margin-bottom: 4px;
-}
 .account-card {
   display: flex;
   align-items: center;

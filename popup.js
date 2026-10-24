@@ -1,9 +1,7 @@
-const DEFAULT_CITIES = [
-  "Tenochtitlan-m1", "Tenochtitlan-m2", "Tenochtitlan-a1", "Tenochtitlan-v1", 
-  "Tenochtitlan-c1", "Tenochtitlan-m3", "Tenochtitlan-m4", "Tenochtitlan-a2", 
-  "Tenochtitlan-v2", "Tenochtitlan-c2", "Tenochtitlan-c3", "Tenochtitlan-c4", 
-  "Tenochtitlan-v3"
-];
+const DEFAULT_CITIES = ["city_1"];
+const DEFAULT_CITY_LABELS = {
+  "city_1": { name: "Ciudad 1", abbr: "C1" }
+};
 
 let cities = [...DEFAULT_CITIES];
 
@@ -558,192 +556,6 @@ function findLegacyDataInStorage(allStorage) {
   return null;
 }
 
-function processHomeBackupImport(parsed, sourceLabel) {
-  if (!parsed || typeof parsed !== 'object') {
-    showHomeBackupStatus("El formato del archivo no es válido.", false);
-    return;
-  }
-
-  let importedLevels = parsed.ikariamLevels;
-  let importedCities = parsed.ikariamCitiesList;
-  let importedBuildings = parsed.ikariamBuildings;
-  let importedLabels = parsed.ikariamCityLabels || {};
-  let importedTroops = parsed.ikariamTroops || null;
-
-  if (!importedLevels) {
-    const firstVal = Object.values(parsed)[0];
-    if (firstVal && typeof firstVal === 'object' && (firstVal["Intendencia"] !== undefined || firstVal["Depósito"] !== undefined)) {
-      importedLevels = parsed;
-      importedCities = Object.keys(parsed);
-    }
-  }
-
-  if (!importedLevels && !importedCities) {
-    showHomeBackupStatus("No se encontraron ciudades ni niveles en el archivo.", false);
-    return;
-  }
-
-  let accName = "Cuenta 1";
-  if (parsed.ikariamAccount && parsed.ikariamAccount.name) {
-    accName = parsed.ikariamAccount.name;
-  } else if (sourceLabel && typeof sourceLabel === 'string') {
-    const cleanLabel = sourceLabel.replace(/\.json$/i, '').replace(/ikariam_backup_/i, '').replace(/ikagovernor_backup_/i, '').trim();
-    if (cleanLabel && cleanLabel !== 'texto') accName = cleanLabel;
-  }
-
-  const worldVal = parsed.ikariamAccount?.world || "";
-
-  const newAcc = {
-    id: "acc_" + Date.now(),
-    name: accName,
-    world: worldVal,
-    createdAt: Date.now()
-  };
-
-  const bundle = {
-    levels: importedLevels || getInitialData(),
-    buildings: importedBuildings || null,
-    cities: importedCities || [...DEFAULT_CITIES],
-    cityLabels: importedLabels,
-    troops: importedTroops
-  };
-
-  accounts.push(newAcc);
-
-  chrome.storage.local.set({
-    ikariamAccounts: accounts,
-    ['ikariam_acc_data_' + newAcc.id]: bundle
-  }, () => {
-    showHomeBackupStatus(`¡Cuenta "${newAcc.name}" restaurada con éxito!`, true);
-    setTimeout(() => {
-      selectAccount(newAcc);
-    }, 350);
-  });
-}
-
-function showHomeBackupStatus(msg, isSuccess) {
-  const el = document.getElementById('home-backup-status');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `status-msg ${isSuccess ? 'success' : 'error'}`;
-}
-
-function setupHomeBackupHandlers() {
-  const btnExportFile = document.getElementById('btn-home-export-file');
-  const btnImportFile = document.getElementById('btn-home-import-file');
-  const inputImportFile = document.getElementById('input-home-import-file');
-  const btnToggleManual = document.getElementById('btn-home-toggle-manual');
-  const manualContainer = document.getElementById('manual-home-backup-container');
-  const btnExport = document.getElementById('btn-home-export');
-  const btnImport = document.getElementById('btn-home-import');
-  const txtBackup = document.getElementById('txt-home-backup');
-
-  if (btnImportFile && inputImportFile) {
-    btnImportFile.onclick = () => {
-      inputImportFile.value = '';
-      inputImportFile.click();
-    };
-
-    inputImportFile.onchange = (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const parsed = JSON.parse(event.target.result);
-          processHomeBackupImport(parsed, file.name);
-        } catch (err) {
-          showHomeBackupStatus("Error al leer el archivo JSON: " + err.message, false);
-        }
-      };
-      reader.onerror = () => {
-        showHomeBackupStatus("No se pudo leer el archivo seleccionado.", false);
-      };
-      reader.readAsText(file, "UTF-8");
-    };
-  }
-
-  if (btnExportFile) {
-    btnExportFile.onclick = () => {
-      const LEGACY_KEYS = ['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'];
-      chrome.storage.local.get(LEGACY_KEYS, (legacyData) => {
-        const dataToExport = {
-          ikariamLevels:      legacyData.ikariamLevels      || appData,
-          ikariamBuildings:   legacyData.ikariamBuildings   || buildingsConfig,
-          ikariamCityLabels:  legacyData.ikariamCityLabels  || cityLabels,
-          ikariamCitiesList:  legacyData.ikariamCitiesList  || cities,
-          ikariamTroops:      legacyData.ikariamTroops      || troopsData,
-          exportDate: new Date().toISOString(),
-          version: "1.0"
-        };
-
-        const jsonStr = JSON.stringify(dataToExport, null, 2);
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        const filename = `ikagovernor_backup_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
-
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-        showHomeBackupStatus(`¡Archivo descargado: ${filename}!`, true);
-      });
-    };
-  }
-
-  if (btnToggleManual && manualContainer) {
-    btnToggleManual.onclick = () => {
-      manualContainer.classList.toggle('hidden');
-    };
-  }
-
-  if (btnExport) {
-    btnExport.onclick = () => {
-      const LEGACY_KEYS = ['ikariamLevels', 'ikariamBuildings', 'ikariamCityLabels', 'ikariamCitiesList', 'ikariamTroops'];
-      chrome.storage.local.get(LEGACY_KEYS, (legacyData) => {
-        const dataToExport = {
-          ikariamLevels:      legacyData.ikariamLevels      || appData,
-          ikariamBuildings:   legacyData.ikariamBuildings   || buildingsConfig,
-          ikariamCityLabels:  legacyData.ikariamCityLabels  || cityLabels,
-          ikariamCitiesList:  legacyData.ikariamCitiesList  || cities,
-          ikariamTroops:      legacyData.ikariamTroops      || troopsData,
-          exportDate: new Date().toISOString(),
-          version: "1.0"
-        };
-        const jsonStr = JSON.stringify(dataToExport, null, 2);
-        if (txtBackup) txtBackup.value = jsonStr;
-        navigator.clipboard.writeText(jsonStr)
-          .then(() => showHomeBackupStatus("¡Copia copiada al portapapeles!", true))
-          .catch(() => showHomeBackupStatus("Exportado al cuadro de texto.", true));
-      });
-    };
-  }
-
-  if (btnImport) {
-    btnImport.onclick = () => {
-      if (!txtBackup) return;
-      const inputStr = txtBackup.value.trim();
-      if (!inputStr) {
-        showHomeBackupStatus("El cuadro de texto está vacío.", false);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(inputStr);
-        processHomeBackupImport(parsed, "texto");
-      } catch (err) {
-        showHomeBackupStatus("JSON inválido: " + err.message, false);
-      }
-    };
-  }
-}
-
 function initAccounts() {
   chrome.storage.local.get(null, (result) => {
     // 1. Si ya existen cuentas guardadas
@@ -753,7 +565,7 @@ function initAccounts() {
       return;
     }
 
-    // 2. Si no hay cuentas o ikariamAccounts estaba vacío, comprobar si hay datos previos para migrarlos a Cuenta 1
+    // 2. Si hay datos previos legacy, migrarlos a Cuenta 1
     const legacy = findLegacyDataInStorage(result);
     if (legacy) {
       const defaultAcc = {
@@ -770,8 +582,27 @@ function initAccounts() {
         renderAccountsList();
       });
     } else {
-      accounts = [];
-      renderAccountsList();
+      // 3. Instalación nueva: crear cuenta por defecto limpia
+      const defaultAcc = {
+        id: "acc_1",
+        name: "Cuenta 1",
+        world: "",
+        createdAt: Date.now()
+      };
+      accounts = [defaultAcc];
+      const freshBundle = {
+        levels: getInitialData(),
+        buildings: JSON.parse(JSON.stringify(DEFAULT_BUILDINGS)),
+        cities: [...DEFAULT_CITIES],
+        cityLabels: { ...DEFAULT_CITY_LABELS },
+        troops: { activeTroopCity: DEFAULT_CITIES[0], cities: {} }
+      };
+      chrome.storage.local.set({
+        ikariamAccounts: accounts,
+        ['ikariam_acc_data_' + defaultAcc.id]: freshBundle
+      }, () => {
+        renderAccountsList();
+      });
     }
   });
 }
@@ -1008,7 +839,7 @@ function renderContent() {
   cities.forEach((city) => {
     const row = document.createElement('div');
     const label = cityLabels[city];
-    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+    const shortCode = (label && label.abbr) ? label.abbr : city;
     const fullName = (label && label.name) ? label.name : city;
 
     if (currentBuilding.isMulti) {
@@ -1413,7 +1244,7 @@ function renderSummary() {
       card.className = 'summary-card-item';
 
       const label = cityLabels[task.city];
-      const cityCode = (label && label.abbr) ? label.abbr : task.city.replace('Tenochtitlan-', '');
+      const cityCode = (label && label.abbr) ? label.abbr : task.city;
       const cityName = (label && label.name) ? label.name : task.city;
 
       const left = document.createElement('div');
@@ -1522,7 +1353,7 @@ function renderSummary() {
       card.className = 'summary-card-item';
 
       const label = cityLabels[item.city];
-      const cityCode = (label && label.abbr) ? label.abbr : item.city.replace('Tenochtitlan-', '');
+      const cityCode = (label && label.abbr) ? label.abbr : item.city;
       const cityName = (label && label.name) ? label.name : item.city;
 
       const left = document.createElement('div');
@@ -1596,7 +1427,7 @@ function renderTroopCityTabs() {
     tab.className = `troop-city-tab ${isActive ? 'active' : ''}`;
     
     const label = cityLabels[city];
-    const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+    const shortCode = (label && label.abbr) ? label.abbr : city;
     const fullName = (label && label.name) ? label.name : city;
 
     tab.textContent = shortCode;
@@ -1918,7 +1749,7 @@ function renderMetaPanel() {
       chip.className = `meta-city-chip ${isSelected ? 'selected' : ''}`;
       
       const label = cityLabels[city];
-      const shortCode = (label && label.abbr) ? label.abbr : city.replace('Tenochtitlan-', '');
+      const shortCode = (label && label.abbr) ? label.abbr : city;
       const fullName = (label && label.name) ? label.name : city;
       chip.textContent = shortCode;
       chip.title = fullName;
@@ -2611,7 +2442,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSettingsHandlers();
   setupGlobalMetaPanel();
   setupAccountModals();
-  setupHomeBackupHandlers();
 
   initAccounts();
 });
