@@ -1,18 +1,20 @@
 # Sesión actual
 
 - Fecha: 2026-10-24
-- Agente: Gemini 2.5 Pro (via Antigravity IDE)
-- Nodo activo: w2
-- Estado validación: no aplica
+- Agente: Claude Sonnet 4.6 (via Antigravity IDE)
+- Nodo activo: cierre
+- Estado validación: no aplica (sin suite de tests)
 
 ## Cambios
 
-- Realizada auditoría de líneas de código (>250L).
-- Detectados y registrados: `popup.js` (2462L) [d1], `popup.css` (1594L) [d2], inicialización síncrona de cuenta [d3].
-- Mapeado plan de refactor en `tasks.md` y `deuda_tecnica.md`.
+- Resuelto w1: bug cuenta por defecto (scope de switchView + init síncrona).
+- Resuelto d1: factorización popup.js → 11 módulos ES en src/.
+- Resuelto d3: DEFAULT_ACCOUNT síncrono antes del callback de storage.
+- Bootstrap .agents y scaffold overview/ completo.
+- Post-mortem documentado en overview/work/pendientes.md.
 
 ## Reanudar
 
-- Siguiente nodo/tarea: w2
-- Agente que reanuda: 
-- Contexto crítico: Resolver d3 primero (garantizar Cuenta 1 visible de inmediato) y luego proceder a modularizar d1 y d2.
+- Siguiente nodo/tarea: w2 (subdividir construction.js 529L)
+- Agente que reanuda:
+- Contexto crítico: ES Modules activos en src/. popup.html carga src/main.js. popup.js legacy intacto pero inactivo. Faltan subdividir 4 módulos >250L y modularizar popup.css.
