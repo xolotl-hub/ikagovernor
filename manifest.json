@@ -4,25 +4,13 @@
   "version": "1.0",
   "description": "Planificador de construcción, niveles y tropas en Ikariam",
   "permissions": ["storage", "sidePanel"],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "ikariam-planner@local",
-      "strict_min_version": "109.0"
-    }
-  },
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
   "action": {
     "default_title": "Abrir Ika Governor"
   },
   "side_panel": {
     "default_path": "popup.html"
-  },
-  "sidebar_action": {
-    "default_panel": "popup.html",
-    "default_title": "Ika Governor",
-    "open_at_install": true
   }
 }

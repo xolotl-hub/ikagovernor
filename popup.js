@@ -356,8 +356,23 @@ function renderAccountsList() {
       document.getElementById('modal-confirm-delete-account').classList.remove('hidden');
     };
 
+    const right = document.createElement('div');
+    right.className = 'account-card-right';
+
+    const enterBtn = document.createElement('button');
+    enterBtn.className = 'btn-enter-account';
+    enterBtn.innerHTML = 'Entrar &#10148;';
+    enterBtn.title = 'Acceder a ' + acc.name;
+    enterBtn.onclick = (e) => {
+      e.stopPropagation();
+      selectAccount(acc);
+    };
+
+    right.appendChild(enterBtn);
+    right.appendChild(delBtn);
+
     card.appendChild(left);
-    card.appendChild(delBtn);
+    card.appendChild(right);
 
     card.onclick = () => {
       selectAccount(acc);

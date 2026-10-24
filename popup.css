@@ -1469,6 +1469,34 @@ body {
   width: fit-content;
   font-weight: 600;
 }
+
+.account-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-enter-account {
+  background: #a23820;
+  color: #fff;
+  border: 1px solid #7e2b18;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.btn-enter-account:hover {
+  background: #b14329;
+  border-color: #5c1e0e;
+  box-shadow: 0 2px 5px rgba(177, 67, 41, 0.25);
+  transform: translateY(-1px);
+}
 .btn-delete-account {
   background: none;
   border: none;
