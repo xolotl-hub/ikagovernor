@@ -16,7 +16,7 @@ export function openDeleteConfirmModal(cityId, cityName) {
 export function populateCityRenameList() {
   const container = document.getElementById('city-rename-list');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
 
   let draggedCityIndex = null;
 
@@ -30,16 +30,36 @@ export function populateCityRenameList() {
     const existingName = label.name || '';
     const existingAbbr = label.abbr || '';
 
-    item.innerHTML = `
-      <span class="city-drag-handle" title="Arrastra para reordenar">☰</span>
-      <span class="city-rename-index">${idx + 1}</span>
-      <input type="text" class="city-rename-input name-input" placeholder="Nombre..." maxlength="30" value="${existingName}">
-      <input type="text" class="city-rename-input abbr-input" placeholder="Abrev" maxlength="6" value="${existingAbbr}">
-      <button class="city-delete-btn" title="Eliminar ciudad">🗑️</button>
-    `;
+    const dragHandle = document.createElement('span');
+    dragHandle.className = 'city-drag-handle';
+    dragHandle.title = 'Arrastra para reordenar';
+    dragHandle.textContent = '☰';
 
-    const nameInput = item.querySelector('.name-input');
-    const abbrInput = item.querySelector('.abbr-input');
+    const indexSpan = document.createElement('span');
+    indexSpan.className = 'city-rename-index';
+    indexSpan.textContent = String(idx + 1);
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'city-rename-input name-input';
+    nameInput.placeholder = 'Nombre...';
+    nameInput.maxLength = 30;
+    nameInput.value = existingName;
+
+    const abbrInput = document.createElement('input');
+    abbrInput.type = 'text';
+    abbrInput.className = 'city-rename-input abbr-input';
+    abbrInput.placeholder = 'Abrev';
+    abbrInput.maxLength = 6;
+    abbrInput.value = existingAbbr;
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'city-delete-btn';
+    deleteBtn.title = 'Eliminar ciudad';
+    deleteBtn.textContent = '🗑️';
+
+    item.append(dragHandle, indexSpan, nameInput, abbrInput, deleteBtn);
+
     const updateLabel = () => {
       const nVal = nameInput.value.trim();
       const aVal = abbrInput.value.trim();
@@ -49,7 +69,7 @@ export function populateCityRenameList() {
     nameInput.addEventListener('input', updateLabel);
     abbrInput.addEventListener('input', updateLabel);
 
-    item.querySelector('.city-delete-btn').onclick = () => openDeleteConfirmModal(city, existingName || city);
+    deleteBtn.onclick = () => openDeleteConfirmModal(city, existingName || city);
 
     item.addEventListener('dragstart', (e) => {
       draggedCityIndex = idx;

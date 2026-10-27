@@ -38,6 +38,8 @@ El bug era **invisible antes de modularizar** por estas razones:
 
 | ID | Descripción | Sesión |
 |---|---|---|
+| p5 | Rutas POSIX (forward-slashes `/`) en ZIP para Firefox AMO | 2026-10-26 |
+| w6 | Erradicación 100% de innerHTML y compatibilidad Firefox Android 142.0 | 2026-10-26 |
 | w1 | Bug cuenta por defecto no aparecía → resuelto con modularización + scope limpio | 2026-10-24 |
 | d1 | popup.js 2462L → 11 módulos ES en src/ | 2026-10-24 |
 | d3 | Inicialización síncrona de Cuenta 1 | 2026-10-24 |

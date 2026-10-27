@@ -5,15 +5,21 @@ import { loadAccountData, saveCurrentAccountBundle, findLegacyDataInStorage } fr
 export function renderAccountsList(onAccountSelected) {
   const container = document.getElementById('accounts-list');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
 
   if (!state.accounts || state.accounts.length === 0) {
-    container.innerHTML = `
-      <div class="accounts-empty-state">
-        <p>No tienes cuentas registradas.</p>
-        <p style="margin-top: 6px; font-size: 11px;">Haz clic en <strong>"+ Agregar Cuenta"</strong> para comenzar a planificar tus ciudades.</p>
-      </div>
-    `;
+    const emptyState = document.createElement('div');
+    emptyState.className = 'accounts-empty-state';
+    const p1 = document.createElement('p');
+    p1.textContent = 'No tienes cuentas registradas.';
+    const p2 = document.createElement('p');
+    p2.style.marginTop = '6px';
+    p2.style.fontSize = '11px';
+    const strong = document.createElement('strong');
+    strong.textContent = '"+ Agregar Cuenta"';
+    p2.append('Haz clic en ', strong, ' para comenzar a planificar tus ciudades.');
+    emptyState.append(p1, p2);
+    container.appendChild(emptyState);
     return;
   }
 
@@ -52,7 +58,7 @@ export function renderAccountsList(onAccountSelected) {
 
     const enterBtn = document.createElement('button');
     enterBtn.className = 'btn-enter-account';
-    enterBtn.innerHTML = 'Entrar &#10148;';
+    enterBtn.textContent = 'Entrar ➔';
     enterBtn.title = 'Acceder a ' + acc.name;
     enterBtn.onclick = (e) => {
       e.stopPropagation();

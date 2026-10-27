@@ -1,5 +1,5 @@
 import { TROOP_DEFINITIONS } from '../constants.js';
-import { state, formatResNum } from '../state.js';
+import { state, formatResNum, makeResChip } from '../state.js';
 import { saveTroopsData } from '../storage.js';
 import { getUnitCostInCity } from './construction_calc.js';
 import { openAddTroopsModal, openUpdateTroopsModal, closeMetaPanel } from './troops_meta.js';
@@ -12,7 +12,7 @@ export function setOnSummaryRefreshForTroops(fn) {
 export function renderTroopCityTabs() {
   const container = document.getElementById('troops-city-tabs');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
 
   if (state.cities.length === 0) {
     container.style.display = 'none';
@@ -55,15 +55,16 @@ export function renderTroopCityTabs() {
 export function renderTroopsContent() {
   const container = document.getElementById('troops-content');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
 
   const city = state.troopsData.activeTroopCity;
   if (!city || !state.cities.includes(city)) {
-    container.innerHTML = `
-      <div class="no-troops-msg">
-        <p>No hay ciudades configuradas. Ve a la pestaña Configuración para añadir una.</p>
-      </div>
-    `;
+    const msg = document.createElement('div');
+    msg.className = 'no-troops-msg';
+    const p = document.createElement('p');
+    p.textContent = 'No hay ciudades configuradas. Ve a la pestaña Configuración para añadir una.';
+    msg.appendChild(p);
+    container.appendChild(msg);
     return;
   }
 
@@ -105,50 +106,42 @@ export function renderTroopsContent() {
   const label = state.cityLabels[city];
   const cityName = (label && label.name) ? label.name : city;
 
-  summaryCard.innerHTML = `
-    <div class="troop-summary-title">
-      <span>Materiales requeridos en <strong>${cityName}</strong> (Tropas y Barcos):</span>
-    </div>
-    <div class="troop-summary-resources">
-      <span class="res-chip" title="Madera faltante: ${totalMissingWood.toLocaleString()}">
-        <img src="assets/resources/wood.png" alt="Madera">
-        <span>${formatResNum(totalMissingWood)}</span>
-      </span>
-      ${totalMissingSulfur > 0 ? `
-        <span class="res-chip" title="Azufre faltante: ${totalMissingSulfur.toLocaleString()}">
-          <img src="assets/resources/sulfur.png" alt="Azufre">
-          <span>${formatResNum(totalMissingSulfur)}</span>
-        </span>
-      ` : ''}
-      ${totalMissingCrystal > 0 ? `
-        <span class="res-chip" title="Cristal faltante: ${totalMissingCrystal.toLocaleString()}">
-          <img src="assets/resources/glass.png" alt="Cristal">
-          <span>${formatResNum(totalMissingCrystal)}</span>
-        </span>
-      ` : ''}
-      ${totalMissingWine > 0 ? `
-        <span class="res-chip" title="Vino faltante: ${totalMissingWine.toLocaleString()}">
-          <img src="assets/resources/wine.png" alt="Vino">
-          <span>${formatResNum(totalMissingWine)}</span>
-        </span>
-      ` : ''}
-    </div>
-  `;
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'troop-summary-title';
+  const titleSpan = document.createElement('span');
+  const strong = document.createElement('strong');
+  strong.textContent = cityName;
+  titleSpan.append('Materiales requeridos en ', strong, ' (Tropas y Barcos):');
+  titleDiv.appendChild(titleSpan);
+  summaryCard.appendChild(titleDiv);
+
+  const resRow = document.createElement('div');
+  resRow.className = 'troop-summary-resources';
+  resRow.appendChild(makeResChip('assets/resources/wood.png', 'Madera faltante', totalMissingWood));
+  if (totalMissingSulfur > 0)  resRow.appendChild(makeResChip('assets/resources/sulfur.png', 'Azufre faltante', totalMissingSulfur));
+  if (totalMissingCrystal > 0) resRow.appendChild(makeResChip('assets/resources/glass.png',  'Cristal faltante', totalMissingCrystal));
+  if (totalMissingWine > 0)    resRow.appendChild(makeResChip('assets/resources/wine.png',   'Vino faltante', totalMissingWine));
+  summaryCard.appendChild(resRow);
   container.appendChild(summaryCard);
 
   const renderMilitarySection = (title, categoryKey, list, map) => {
     const secHeader = document.createElement('div');
     secHeader.className = 'military-section-header';
-    secHeader.innerHTML = `
-      <span class="military-section-title">${title}</span>
-      <div class="military-header-actions">
-        <button class="btn-action primary btn-mini btn-sec-add">+ Añadir</button>
-        <button class="btn-action btn-mini btn-sec-update">⚡ Actualizar</button>
-      </div>
-    `;
-
-    secHeader.querySelector('.btn-sec-add').onclick = () => openAddTroopsModal(categoryKey);
-    secHeader.querySelector('.btn-sec-update').onclick = () => openUpdateTroopsModal(categoryKey);
+    const secTitle = document.createElement('span');
+    secTitle.className = 'military-section-title';
+    secTitle.textContent = title;
+    const actions = document.createElement('div');
+    actions.className = 'military-header-actions';
+    const btnAdd = document.createElement('button');
+    btnAdd.className = 'btn-action primary btn-mini btn-sec-add';
+    btnAdd.textContent = '+ Añadir';
+    const btnUpd = document.createElement('button');
+    btnUpd.className = 'btn-action btn-mini btn-sec-update';
+    btnUpd.textContent = '⚡ Actualizar';
+    actions.appendChild(btnAdd);
+    actions.appendChild(btnUpd);
+    secHeader.appendChild(secTitle);
+    secHeader.appendChild(actions);
     container.appendChild(secHeader);
 
     const visibleItems = list.filter(item => {
@@ -160,11 +153,16 @@ export function renderTroopsContent() {
       const emptyBox = document.createElement('div');
       emptyBox.className = 'no-troops-msg';
       emptyBox.style.padding = '8px 5px';
-      emptyBox.innerHTML = `
-        <span style="font-size:11px;">No hay registros en esta sección.</span>
-        <button class="btn-action primary btn-mini" style="margin-left:6px;">+ Añadir</button>
-      `;
-      emptyBox.querySelector('button').onclick = () => openAddTroopsModal(categoryKey);
+      const emptyMsg = document.createElement('span');
+      emptyMsg.style.fontSize = '11px';
+      emptyMsg.textContent = 'No hay registros en esta sección.';
+      const btnEmpty = document.createElement('button');
+      btnEmpty.className = 'btn-action primary btn-mini';
+      btnEmpty.style.marginLeft = '6px';
+      btnEmpty.textContent = '+ Añadir';
+      btnEmpty.onclick = () => openAddTroopsModal(categoryKey);
+      emptyBox.appendChild(emptyMsg);
+      emptyBox.appendChild(btnEmpty);
       container.appendChild(emptyBox);
       return;
     }
@@ -182,19 +180,28 @@ export function renderTroopsContent() {
 
       const colIdentity = document.createElement('div');
       colIdentity.className = 'troop-col-identity';
-      colIdentity.innerHTML = `
-        <div class="troop-icon-container">
-          <img src="${item.icon}" alt="${item.name}">
-        </div>
-        <span class="troop-name" title="${item.name}">${item.name}</span>
-      `;
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'troop-icon-container';
+      const img = document.createElement('img');
+      img.src = item.icon;
+      img.alt = item.name;
+      iconWrap.appendChild(img);
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'troop-name';
+      nameSpan.title = item.name;
+      nameSpan.textContent = item.name;
+      colIdentity.appendChild(iconWrap);
+      colIdentity.appendChild(nameSpan);
 
       const colInputs = document.createElement('div');
       colInputs.className = 'troop-col-inputs';
 
       const rowReal = document.createElement('div');
       rowReal.className = 'troop-field-row';
-      rowReal.innerHTML = `<label title="Cantidad real">R:</label>`;
+      const lblReal = document.createElement('label');
+      lblReal.title = 'Cantidad real';
+      lblReal.textContent = 'R:';
+      rowReal.appendChild(lblReal);
       const inputReal = document.createElement('input');
       inputReal.type = 'number';
       inputReal.className = 'troop-input-num';
@@ -211,7 +218,10 @@ export function renderTroopsContent() {
 
       const rowMeta = document.createElement('div');
       rowMeta.className = 'troop-field-row';
-      rowMeta.innerHTML = `<label title="Cantidad deseada">M:</label>`;
+      const lblMeta = document.createElement('label');
+      lblMeta.title = 'Cantidad deseada';
+      lblMeta.textContent = 'M:';
+      rowMeta.appendChild(lblMeta);
       const inputMeta = document.createElement('input');
       inputMeta.type = 'number';
       inputMeta.className = 'troop-input-num';
@@ -237,39 +247,16 @@ export function renderTroopsContent() {
         const mSulfur = missing * cost.sulfur;
         const mCrystal = missing * cost.crystal;
         const mWine = missing * cost.wine;
-
-        colMats.innerHTML = `
-          <span class="res-chip-mini" title="Madera: ${mWood.toLocaleString()}">
-            <img src="assets/resources/wood.png" alt="Madera">
-            <span>${formatResNum(mWood)}</span>
-          </span>
-        `;
-        if (mSulfur > 0) {
-          colMats.innerHTML += `
-            <span class="res-chip-mini" title="Azufre: ${mSulfur.toLocaleString()}">
-              <img src="assets/resources/sulfur.png" alt="Azufre">
-              <span>${formatResNum(mSulfur)}</span>
-            </span>
-          `;
-        }
-        if (mCrystal > 0) {
-          colMats.innerHTML += `
-            <span class="res-chip-mini" title="Cristal: ${mCrystal.toLocaleString()}">
-              <img src="assets/resources/glass.png" alt="Cristal">
-              <span>${formatResNum(mCrystal)}</span>
-            </span>
-          `;
-        }
-        if (mWine > 0) {
-          colMats.innerHTML += `
-            <span class="res-chip-mini" title="Vino: ${mWine.toLocaleString()}">
-              <img src="assets/resources/wine.png" alt="Vino">
-              <span>${formatResNum(mWine)}</span>
-            </span>
-          `;
-        }
+        colMats.appendChild(makeResChip('assets/resources/wood.png', 'Madera', mWood, 'res-chip-mini'.replace('res-chip ','')));
+        if (mSulfur > 0)  colMats.appendChild(makeResChip('assets/resources/sulfur.png', 'Azufre',  mSulfur,  'res-chip-mini'.replace('res-chip ','')));
+        if (mCrystal > 0) colMats.appendChild(makeResChip('assets/resources/glass.png',  'Cristal', mCrystal, 'res-chip-mini'.replace('res-chip ','')));
+        if (mWine > 0)    colMats.appendChild(makeResChip('assets/resources/wine.png',   'Vino',    mWine,    'res-chip-mini'.replace('res-chip ','')));
       } else {
-        colMats.innerHTML = `<span class="res-chip-done" title="Meta alcanzada">✔️</span>`;
+        const doneSpan = document.createElement('span');
+        doneSpan.className = 'res-chip-done';
+        doneSpan.title = 'Meta alcanzada';
+        doneSpan.textContent = '✔️';
+        colMats.appendChild(doneSpan);
       }
 
       card.appendChild(colIdentity);

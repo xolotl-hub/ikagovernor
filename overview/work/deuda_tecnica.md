@@ -8,14 +8,13 @@
 
 | ID | Ubicación / Componente | Descripción de la Deuda | Impacto | Confianza | Estado |
 |---|---|---|---|---|---|
-| d1 | `popup.js` (2462L) | Monolito de 2462L (límite 250L). Concentra lógica de 8 dominios (cuentas, storage, construcción, tropas, resumen, config, modales, navegación) | Crítico (Mantenibilidad / Tokens) | `alta` | `activo` |
-| d3 | `popup.js` (initAccounts) | Inicialización asíncrona de cuenta default propensa a vacíos en primer arranque | Funcional (Acceso de usuario) | `alta` | `en progreso` |
+| - | - | Sin deuda crítica activa | - | - | - |
 
 ## 🟡 Prioridad Media (Impacto Moderado / Mantenibilidad)
 
 | ID | Ubicación / Componente | Descripción de la Deuda | Impacto | Confianza | Estado |
 |---|---|---|---|---|---|
-| d2 | `popup.css` (1594L) | Hoja de estilos monolítica de 1594L (límite 250L). Modularizable en archivos CSS por dominio | Mantenibilidad | `alta` | `activo` |
+| d2 | `popup.css` (1566L) | Hoja de estilos monolítica de 1566L (límite 250L). Modularizable en archivos CSS por dominio | Mantenibilidad | `alta` | `activo` |
 
 ## 🟢 Prioridad Baja (Mejora Menor / Estilo)
 
@@ -26,3 +25,8 @@
 ---
 
 ## ✅ Completados (Historial)
+
+| ID | Ubicación / Componente | Resuelto por (Agente) | Resumen Solución | Fecha |
+|---|---|---|---|---|
+| d1 | `popup.js` (2462L) | Claude Sonnet 4.6 | Monolito 2462L → 11 módulos ES en src/ | 2026-10-24 |
+| d3 | `popup.js` (initAccounts) | Claude Sonnet 4.6 | Init asíncrona sin fallback → renderAccountsList() síncrono antes del callback | 2026-10-24 |

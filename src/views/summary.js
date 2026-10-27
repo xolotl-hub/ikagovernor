@@ -1,12 +1,12 @@
 import { TROOP_DEFINITIONS } from '../constants.js';
-import { state, formatResNum } from '../state.js';
+import { state, formatResNum, makeResChip } from '../state.js';
 import { getBuildingUpgradeCost, getUnitCostInCity, getActiveTargetIndex } from './construction_calc.js';
 
 export function renderSummary() {
   // 1. Próximas 6 Construcciones
   const bContainer = document.getElementById('summary-cards-container');
   if (!bContainer) return;
-  bContainer.innerHTML = '';
+  bContainer.replaceChildren();
 
   const metaKeys = ["meta1", "meta2", "meta3", "meta4", "meta5", "meta6"];
   const candidateTasks = [];
@@ -49,7 +49,12 @@ export function renderSummary() {
   }
 
   if (candidateTasks.length === 0) {
-    bContainer.innerHTML = `<div class="no-troops-msg"><p>🎉 ¡Todas las ciudades han alcanzado las metas actuales en los edificios prioritarios!</p></div>`;
+    const msg = document.createElement('div');
+    msg.className = 'no-troops-msg';
+    const p = document.createElement('p');
+    p.textContent = '🎉 ¡Todas las ciudades han alcanzado las metas actuales en los edificios prioritarios!';
+    msg.appendChild(p);
+    bContainer.appendChild(msg);
   } else {
     candidateTasks.forEach((task, idx) => {
       const card = document.createElement('div');
@@ -59,33 +64,35 @@ export function renderSummary() {
       const cityName = (label && label.name) ? label.name : task.city;
       const left = document.createElement('div');
       left.className = 'summary-card-left';
-      left.innerHTML = `
-        <div>
-          <span class="summary-rank-badge">#${idx + 1}</span>
-          <span class="summary-b-name">${task.buildingName}</span>
-        </div>
-        <div class="summary-city-name">${cityCode} (${cityName})</div>
-      `;
+      const topRow = document.createElement('div');
+      const badge = document.createElement('span');
+      badge.className = 'summary-rank-badge';
+      badge.textContent = `#${idx + 1}`;
+      const bName = document.createElement('span');
+      bName.className = 'summary-b-name';
+      bName.textContent = task.buildingName;
+      topRow.appendChild(badge);
+      topRow.appendChild(bName);
+      const cityDiv = document.createElement('div');
+      cityDiv.className = 'summary-city-name';
+      cityDiv.textContent = `${cityCode} (${cityName})`;
+      left.appendChild(topRow);
+      left.appendChild(cityDiv);
       const right = document.createElement('div');
       right.className = 'summary-card-right';
-      let costHtml = '';
+      const lvlDiv = document.createElement('div');
+      lvlDiv.className = 'summary-levels';
+      lvlDiv.textContent = `Nivel ${task.currentLevel} ➤ ${task.targetLevel}`;
+      right.appendChild(lvlDiv);
       if (task.cost) {
-        costHtml = `
-          <div class="building-cost-tag">
-            <span class="res-chip ${task.cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${task.cost.wood.toLocaleString()}">
-              <img src="assets/resources/wood.png" alt="Madera">
-              <span>${formatResNum(task.cost.wood)}</span>
-            </span>
-            ${task.cost.marble > 0 ? `
-              <span class="res-chip ${task.cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${task.cost.marble.toLocaleString()}">
-                <img src="assets/resources/marble.png" alt="Mármol">
-                <span>${formatResNum(task.cost.marble)}</span>
-              </span>
-            ` : ''}
-          </div>
-        `;
+        const costTag = document.createElement('div');
+        costTag.className = 'building-cost-tag';
+        costTag.appendChild(makeResChip('assets/resources/wood.png', 'Madera', task.cost.wood, task.cost.woodDiscount > 0 ? 'discounted' : ''));
+        if (task.cost.marble > 0) {
+          costTag.appendChild(makeResChip('assets/resources/marble.png', 'Mármol', task.cost.marble, task.cost.marbleDiscount > 0 ? 'discounted' : ''));
+        }
+        right.appendChild(costTag);
       }
-      right.innerHTML = `<div class="summary-levels">Nivel ${task.currentLevel} ➔ ${task.targetLevel}</div>${costHtml}`;
       card.appendChild(left);
       card.appendChild(right);
       bContainer.appendChild(card);
@@ -95,7 +102,7 @@ export function renderSummary() {
   // 2. Top 6 Ciudades con más tropas faltantes
   const troopsContainer = document.getElementById('summary-troops-container');
   if (!troopsContainer) return;
-  troopsContainer.innerHTML = '';
+  troopsContainer.replaceChildren();
 
   const troopDeficits = [];
   state.cities.forEach(city => {
@@ -132,7 +139,12 @@ export function renderSummary() {
   const top6 = troopDeficits.slice(0, 6);
 
   if (top6.length === 0) {
-    troopsContainer.innerHTML = `<div class="no-troops-msg"><p>🎉 ¡Todas las ciudades tienen sus metas de tropas y barcos al 100%!</p></div>`;
+    const msg = document.createElement('div');
+    msg.className = 'no-troops-msg';
+    const p = document.createElement('p');
+    p.textContent = '🎉 ¡Todas las ciudades tienen sus metas de tropas y barcos al 100%!';
+    msg.appendChild(p);
+    troopsContainer.appendChild(msg);
   } else {
     top6.forEach((item, idx) => {
       const card = document.createElement('div');
@@ -142,23 +154,29 @@ export function renderSummary() {
       const cityName = (label && label.name) ? label.name : item.city;
       const left = document.createElement('div');
       left.className = 'summary-card-left';
-      left.innerHTML = `
-        <div>
-          <span class="summary-rank-badge">#${idx + 1}</span>
-          <span class="summary-b-name">${cityCode} (${cityName})</span>
-        </div>
-        <div class="summary-troop-deficit">Faltan ${item.totalDeficit.toLocaleString()} unidades</div>
-      `;
+      const topRow = document.createElement('div');
+      const badge = document.createElement('span');
+      badge.className = 'summary-rank-badge';
+      badge.textContent = `#${idx + 1}`;
+      const bName = document.createElement('span');
+      bName.className = 'summary-b-name';
+      bName.textContent = `${cityCode} (${cityName})`;
+      topRow.appendChild(badge);
+      topRow.appendChild(bName);
+      const defDiv = document.createElement('div');
+      defDiv.className = 'summary-troop-deficit';
+      defDiv.textContent = `Faltan ${item.totalDeficit.toLocaleString()} unidades`;
+      left.appendChild(topRow);
+      left.appendChild(defDiv);
       const right = document.createElement('div');
       right.className = 'summary-card-right';
-      right.innerHTML = `
-        <div class="building-cost-tag">
-          ${item.wood > 0 ? `<span class="res-chip" title="Madera: ${item.wood.toLocaleString()}"><img src="assets/resources/wood.png" alt="Madera"><span>${formatResNum(item.wood)}</span></span>` : ''}
-          ${item.sulfur > 0 ? `<span class="res-chip" title="Azufre: ${item.sulfur.toLocaleString()}"><img src="assets/resources/sulfur.png" alt="Azufre"><span>${formatResNum(item.sulfur)}</span></span>` : ''}
-          ${item.crystal > 0 ? `<span class="res-chip" title="Cristal: ${item.crystal.toLocaleString()}"><img src="assets/resources/glass.png" alt="Cristal"><span>${formatResNum(item.crystal)}</span></span>` : ''}
-          ${item.wine > 0 ? `<span class="res-chip" title="Vino: ${item.wine.toLocaleString()}"><img src="assets/resources/wine.png" alt="Vino"><span>${formatResNum(item.wine)}</span></span>` : ''}
-        </div>
-      `;
+      const costTag = document.createElement('div');
+      costTag.className = 'building-cost-tag';
+      if (item.wood > 0)    costTag.appendChild(makeResChip('assets/resources/wood.png',   'Madera', item.wood));
+      if (item.sulfur > 0)  costTag.appendChild(makeResChip('assets/resources/sulfur.png', 'Azufre', item.sulfur));
+      if (item.crystal > 0) costTag.appendChild(makeResChip('assets/resources/glass.png',  'Cristal', item.crystal));
+      if (item.wine > 0)    costTag.appendChild(makeResChip('assets/resources/wine.png',   'Vino', item.wine));
+      right.appendChild(costTag);
       card.appendChild(left);
       card.appendChild(right);
       troopsContainer.appendChild(card);

@@ -1,4 +1,4 @@
-import { state, formatResNum } from '../state.js';
+import { state, formatResNum, makeResChip } from '../state.js';
 import { saveData } from '../storage.js';
 import { getBuildingUpgradeCost, getLevelClass, getBuildingLowestAchievedClass, getActiveTargetIndex } from './construction_calc.js';
 
@@ -10,7 +10,7 @@ export function setOnSummaryRefresh(fn) {
 export function renderTabs() {
   const tabsContainer = document.getElementById('tabs');
   if (!tabsContainer || !state.currentBuilding) return;
-  tabsContainer.innerHTML = '';
+  tabsContainer.replaceChildren();
   
   let draggedBuildingIndex = null;
   const metaLabels = ["Madera (Meta 1)", "Cobre (Meta 2)", "Verde (Meta 3)", "Azul (Meta 4)", "Dorado (Meta 5)", "Platino (Meta 6)"];
@@ -86,7 +86,7 @@ export function renderTabs() {
 export function renderMetaSummary() {
   const summaryContainer = document.getElementById('meta-summary');
   if (!summaryContainer || !state.currentBuilding) return;
-  summaryContainer.innerHTML = '';
+  summaryContainer.replaceChildren();
   
   const activeTargetIndex = getActiveTargetIndex();
   
@@ -162,7 +162,7 @@ export function syncEditInputsToData() {
 export function renderContent() {
   const content = document.getElementById('content');
   if (!content || !state.currentBuilding) return;
-  content.innerHTML = '';
+  content.replaceChildren();
   
   const newContent = content.cloneNode(false);
   const maxGoal = state.currentBuilding.meta6 || 1;
@@ -237,19 +237,9 @@ export function renderContent() {
         if (cost) {
           costEl = document.createElement('div');
           costEl.className = 'building-cost-tag';
-          costEl.innerHTML = `
-            <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${cost.wood.toLocaleString()}">
-              <img src="assets/resources/wood.png" alt="Madera">
-              <span>${formatResNum(cost.wood)}</span>
-            </span>
-          `;
+          costEl.appendChild(makeResChip('assets/resources/wood.png', 'Madera', cost.wood, cost.woodDiscount > 0 ? 'discounted' : ''));
           if (cost.marble > 0) {
-            costEl.innerHTML += `
-              <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${cost.marble.toLocaleString()}">
-                <img src="assets/resources/marble.png" alt="Mármol">
-                <span>${formatResNum(cost.marble)}</span>
-              </span>
-            `;
+            costEl.appendChild(makeResChip('assets/resources/marble.png', 'Mármol', cost.marble, cost.marbleDiscount > 0 ? 'discounted' : ''));
           }
           instRow.appendChild(costEl);
         }
@@ -311,19 +301,11 @@ export function renderContent() {
             if (costEl) {
               const uCost = getBuildingUpgradeCost(state.currentBuilding.name, newLevel, city);
               if (uCost) {
-                costEl.innerHTML = `
-                  <span class="res-chip ${uCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${uCost.wood.toLocaleString()}">
-                    <img src="assets/resources/wood.png" alt="Madera">
-                    <span>${formatResNum(uCost.wood)}</span>
-                  </span>
-                `;
+                costEl.replaceChildren(
+                  makeResChip('assets/resources/wood.png', 'Madera', uCost.wood, uCost.woodDiscount > 0 ? 'discounted' : '')
+                );
                 if (uCost.marble > 0) {
-                  costEl.innerHTML += `
-                    <span class="res-chip ${uCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${uCost.marble.toLocaleString()}">
-                      <img src="assets/resources/marble.png" alt="Mármol">
-                      <span>${formatResNum(uCost.marble)}</span>
-                    </span>
-                  `;
+                  costEl.appendChild(makeResChip('assets/resources/marble.png', 'Mármol', uCost.marble, uCost.marbleDiscount > 0 ? 'discounted' : ''));
                 }
               }
             }
@@ -374,19 +356,9 @@ export function renderContent() {
       if (cost) {
         costEl = document.createElement('div');
         costEl.className = 'building-cost-tag';
-        costEl.innerHTML = `
-          <span class="res-chip ${cost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${cost.wood.toLocaleString()}">
-            <img src="assets/resources/wood.png" alt="Madera">
-            <span>${formatResNum(cost.wood)}</span>
-          </span>
-        `;
+        costEl.appendChild(makeResChip('assets/resources/wood.png', 'Madera', cost.wood, cost.woodDiscount > 0 ? 'discounted' : ''));
         if (cost.marble > 0) {
-          costEl.innerHTML += `
-            <span class="res-chip ${cost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${cost.marble.toLocaleString()}">
-              <img src="assets/resources/marble.png" alt="Mármol">
-              <span>${formatResNum(cost.marble)}</span>
-            </span>
-          `;
+          costEl.appendChild(makeResChip('assets/resources/marble.png', 'Mármol', cost.marble, cost.marbleDiscount > 0 ? 'discounted' : ''));
         }
       }
       
@@ -435,19 +407,11 @@ export function renderContent() {
           if (costEl) {
             const updatedCost = getBuildingUpgradeCost(state.currentBuilding.name, newLevel, city);
             if (updatedCost) {
-              costEl.innerHTML = `
-                <span class="res-chip ${updatedCost.woodDiscount > 0 ? 'discounted' : ''}" title="Madera: ${updatedCost.wood.toLocaleString()}">
-                  <img src="assets/resources/wood.png" alt="Madera">
-                  <span>${formatResNum(updatedCost.wood)}</span>
-                </span>
-              `;
+              costEl.replaceChildren(
+                makeResChip('assets/resources/wood.png', 'Madera', updatedCost.wood, updatedCost.woodDiscount > 0 ? 'discounted' : '')
+              );
               if (updatedCost.marble > 0) {
-                costEl.innerHTML += `
-                  <span class="res-chip ${updatedCost.marbleDiscount > 0 ? 'discounted' : ''}" title="Mármol: ${updatedCost.marble.toLocaleString()}">
-                    <img src="assets/resources/marble.png" alt="Mármol">
-                    <span>${formatResNum(updatedCost.marble)}</span>
-                  </span>
-                `;
+                costEl.appendChild(makeResChip('assets/resources/marble.png', 'Mármol', updatedCost.marble, updatedCost.marbleDiscount > 0 ? 'discounted' : ''));
               }
             }
           }

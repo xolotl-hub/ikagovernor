@@ -41,7 +41,7 @@ export function closeMetaPanel(renderTroopCityTabsFn) {
 export function renderMetaPanel() {
   const chipsContainer = document.getElementById('meta-city-chips');
   if (chipsContainer) {
-    chipsContainer.innerHTML = '';
+    chipsContainer.replaceChildren();
 
     const toggleAllBtn = document.createElement('span');
     toggleAllBtn.className = 'meta-city-chip toggle-all';
@@ -83,7 +83,7 @@ export function renderMetaPanel() {
   const renderCatalogGrid = (containerId, categoryKey, list) => {
     const grid = document.getElementById(containerId);
     if (!grid) return;
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     list.forEach(item => {
       const card = document.createElement('div');
@@ -93,18 +93,37 @@ export function renderMetaPanel() {
         ? state.metaPanelInputs[categoryKey][item.id]
         : '';
 
-      card.innerHTML = `
-        <div class="meta-card-icon-wrap" title="${item.name}">
-          <img src="${item.icon}" alt="${item.name}">
-        </div>
-        <span class="meta-card-name" title="${item.name}">${item.name}</span>
-        <div class="meta-card-input-row">
-          <label>Meta:</label>
-          <input type="number" min="0" placeholder="0" class="troop-input-num" value="${existingVal}">
-        </div>
-      `;
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'meta-card-icon-wrap';
+      iconWrap.title = item.name;
+      const img = document.createElement('img');
+      img.src = item.icon;
+      img.alt = item.name;
+      iconWrap.appendChild(img);
 
-      const input = card.querySelector('input');
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'meta-card-name';
+      nameSpan.title = item.name;
+      nameSpan.textContent = item.name;
+
+      const inputRow = document.createElement('div');
+      inputRow.className = 'meta-card-input-row';
+      const label = document.createElement('label');
+      label.textContent = 'Meta:';
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.placeholder = '0';
+      input.className = 'troop-input-num';
+      input.value = existingVal;
+
+      inputRow.appendChild(label);
+      inputRow.appendChild(input);
+
+      card.appendChild(iconWrap);
+      card.appendChild(nameSpan);
+      card.appendChild(inputRow);
+
       input.addEventListener('input', () => {
         const val = input.value.trim();
         if (!state.metaPanelInputs[categoryKey]) state.metaPanelInputs[categoryKey] = {};
@@ -187,7 +206,7 @@ export function openAddTroopsModal(categoryKey = "units") {
   const modal = document.getElementById('modal-add-troops');
   const title = document.getElementById('modal-add-troops-title');
   const container = document.getElementById('add-troops-catalog-list');
-  container.innerHTML = '';
+  container.replaceChildren();
 
   const isUnits = categoryKey === "units";
   title.textContent = isUnits ? "Añadir Tropas Terrestres" : "Añadir Barcos de Guerra";
@@ -204,32 +223,42 @@ export function openAddTroopsModal(categoryKey = "units") {
     const row = document.createElement('div');
     row.className = 'troop-modal-row';
 
-    row.innerHTML = `
-      <div class="troop-modal-row-left">
-        <img src="${item.icon}" alt="${item.name}">
-        <span>${item.name}</span>
-      </div>
-    `;
+    const leftDiv = document.createElement('div');
+    leftDiv.className = 'troop-modal-row-left';
+    const img = document.createElement('img');
+    img.src = item.icon;
+    img.alt = item.name;
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = item.name;
+    leftDiv.appendChild(img);
+    leftDiv.appendChild(nameSpan);
 
     const inputsDiv = document.createElement('div');
     inputsDiv.className = 'troop-modal-inputs';
 
-    inputsDiv.innerHTML = `<label>Real:</label>`;
+    const lblReal = document.createElement('label');
+    lblReal.textContent = 'Real:';
     const actInp = document.createElement('input');
     actInp.type = 'number';
     actInp.className = 'troop-input-num';
     actInp.min = '0';
     actInp.value = existing.actual || 0;
 
-    inputsDiv.innerHTML += `<label style="margin-left:4px;">Meta:</label>`;
+    const lblMeta = document.createElement('label');
+    lblMeta.style.marginLeft = '4px';
+    lblMeta.textContent = 'Meta:';
     const desInp = document.createElement('input');
     desInp.type = 'number';
     desInp.className = 'troop-input-num';
     desInp.min = '0';
     desInp.value = existing.desired || 0;
 
+    inputsDiv.appendChild(lblReal);
     inputsDiv.appendChild(actInp);
+    inputsDiv.appendChild(lblMeta);
     inputsDiv.appendChild(desInp);
+
+    row.appendChild(leftDiv);
     row.appendChild(inputsDiv);
     container.appendChild(row);
 
@@ -261,7 +290,7 @@ export function openUpdateTroopsModal(categoryKey = "units") {
   const modal = document.getElementById('modal-update-troops');
   const title = document.getElementById('modal-update-troops-title');
   const container = document.getElementById('update-troops-active-list');
-  container.innerHTML = '';
+  container.replaceChildren();
 
   const isUnits = categoryKey === "units";
   const catName = isUnits ? "Tropas" : "Barcos";
@@ -273,7 +302,10 @@ export function openUpdateTroopsModal(categoryKey = "units") {
   const activeList = list.filter(u => cityMap[u.id] && ((cityMap[u.id].actual > 0) || (cityMap[u.id].desired > 0)));
 
   if (activeList.length === 0) {
-    container.innerHTML = `<p style="padding:10px;text-align:center;font-size:11px;color:#666;">No hay ${catName.toLowerCase()} registrados en esta ciudad aún. Usa "+ Añadir" primero.</p>`;
+    const emptyMsg = document.createElement('p');
+    emptyMsg.style.cssText = 'padding:10px;text-align:center;font-size:11px;color:#666;';
+    emptyMsg.textContent = `No hay ${catName.toLowerCase()} registrados en esta ciudad aún. Usa "+ Añadir" primero.`;
+    container.appendChild(emptyMsg);
   }
 
   const tempInputs = {};
@@ -283,16 +315,20 @@ export function openUpdateTroopsModal(categoryKey = "units") {
     const row = document.createElement('div');
     row.className = 'troop-modal-row';
 
-    row.innerHTML = `
-      <div class="troop-modal-row-left">
-        <img src="${item.icon}" alt="${item.name}">
-        <span>${item.name}</span>
-      </div>
-    `;
+    const leftDiv = document.createElement('div');
+    leftDiv.className = 'troop-modal-row-left';
+    const img = document.createElement('img');
+    img.src = item.icon;
+    img.alt = item.name;
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = item.name;
+    leftDiv.appendChild(img);
+    leftDiv.appendChild(nameSpan);
 
     const inputsDiv = document.createElement('div');
     inputsDiv.className = 'troop-modal-inputs';
-    inputsDiv.innerHTML = `<label>Quedan:</label>`;
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Quedan:';
 
     const actInp = document.createElement('input');
     actInp.type = 'number';
@@ -300,7 +336,9 @@ export function openUpdateTroopsModal(categoryKey = "units") {
     actInp.min = '0';
     actInp.value = existing.actual || 0;
 
+    inputsDiv.appendChild(lbl);
     inputsDiv.appendChild(actInp);
+    row.appendChild(leftDiv);
     row.appendChild(inputsDiv);
     container.appendChild(row);
 

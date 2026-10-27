@@ -4,32 +4,28 @@
 
 ## 🎯 Tarea Actual
 
-- **ID:** `w2`
-- **Descripción:** Factorización modular completa de popup.js (2462L) a arquitectura ES Modules (<250L por archivo)
-- **Estado:** `activo`
+- **ID:** `w6`
+- **Descripción:** Remoción de `innerHTML` inseguro (25 avisos de linter Mozilla) y alineación de `strict_min_version` 142.0
+- **Estado:** `hecho`
 - **Confianza:** `alta`
-- **Agente:** `Gemini 2.5 Pro (via Antigravity IDE)`
-- **Fecha inicio:** `2026-10-24`
+- **Agente:** `Gemini 3.8 Flash (via Antigravity IDE)`
+- **Fecha inicio:** `2026-10-26`
 
 ## 🏷️ Clasificación
 
-- [ ] **Problema** (comportamiento inesperado o falla)
-- [ ] **Mejora** (optimización o evolución funcional)
-- [x] **Refactor** (reestructuración sin cambio de comportamiento)
+- [x] **Problema** (comportamiento inesperado o falla de validación)
+- [x] **Mejora** (seguridad DOM y compatibilidad estricta con AMO)
+- [ ] **Refactor** (reestructuración sin cambio de comportamiento)
 
 ## 🛤️ Rutas de Trabajo y Posibles Soluciones
 
-### Diagnóstico
-Monolito `popup.js` de 2462L con funciones mal anidadas (`setupNavigation` / `switchView`) que rompían la ejecución en tiempo de carga en Chrome.
+### Diagnóstico & Hipótesis Causa Raíz
+> **Hipótesis causa raíz:** Linter de AMO prohíbe innerHTML dinámico. (6 palabras)
 
-### Arquitectura ES Modules Modular (<250L por archivo)
-1. `src/constants.js` (~80L) - Datos fijos de Ikariam (edificios, tropas, costos, cuenta inicial).
-2. `src/state.js` (~50L) - Estado compartido reactivo de la sesión.
-3. `src/storage.js` (~150L) - Adaptador `chrome.storage.local` y migraciones legacy.
-4. `src/views/accounts.js` (~170L) - Selector de cuentas, modales de alta/baja y render inmediato de Cuenta 1.
-5. `src/views/construction.js` (~240L) - Vista de construcción, tabs de edificios, checkpoints y costos.
-6. `src/views/troops.js` (~240L) - Simulador de tropas, tabs por ciudad y panel global de metas.
-7. `src/views/summary.js` (~180L) - Resumen de las próximas 6 construcciones prioritarias.
-8. `src/views/settings.js` (~140L) - Renombrar ciudades, exportar e importar JSON.
-9. `src/main.js` (~60L) - Router de vistas (`switchView`) y bootstrap de eventos.
-10. `popup.html` - Carga `<script type="module" src="src/main.js"></script>`.
+El validador de addons de Mozilla Firefox detectó 25 advertencias por `Unsafe assignment to innerHTML` con variables interpoladas en las vistas (`construction.js`, `summary.js`, `troops.js`, `troops_meta.js`, `settings.js`, `accounts.js`), además del desfase de versión mínima para Android con `data_collection_permissions`.
+
+### Solución Ejecutada
+1. **Manifest Firefox & Manifest Activo:** Se fijó `strict_min_version: "142.0"` y `data_collection_permissions: { required: ["none"], optional: [] }`, eliminando el aviso de compatibilidad en Android.
+2. **DOM Seguro:** Se reemplazó el 100% de los `innerHTML` con `document.createElement`, `textContent`, `append`/`appendChild` y `makeResChip` en todas las vistas (`troops.js`, `troops_meta.js`, `summary.js`, `construction.js`, `settings.js`, `accounts.js`).
+3. **Limpieza de Contenedores:** Se reemplazó `element.innerHTML = ''` por el estándar moderno `element.replaceChildren()`, evitando falsos positivos de escaneo estático.
+4. **Re-empaquetado:** Se generaron los nuevos paquetes `.zip` en `dist/` limpios y sin advertencias de linteo.
